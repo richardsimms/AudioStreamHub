@@ -75,8 +75,14 @@ async function setupEmailRoutes() {
       await mg.routes.destroy(route.id);
     }
 
-    // Ensure webhook URL is properly formatted with https://
-    const webhookUrl = new URL("/api/email/incoming", process.env.PUBLIC_WEBHOOK_URL).toString();
+    // Ensure webhook URL is properly formatted
+    let webhookUrl = process.env.PUBLIC_WEBHOOK_URL;
+    if (!webhookUrl.startsWith('http://') && !webhookUrl.startsWith('https://')) {
+      webhookUrl = `https://${webhookUrl}`;
+    }
+
+    // Append the email endpoint path
+    webhookUrl = `${webhookUrl}/api/email/incoming`;
     console.log("Using webhook URL:", webhookUrl);
 
     console.log("Creating new route for email forwarding...");
