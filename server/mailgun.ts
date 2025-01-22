@@ -44,14 +44,9 @@ async function verifyDomainSetup() {
     process.env.MAILGUN_DOMAIN = sandboxDomain.name;
 
     // Get the authorized recipients for the sandbox domain
-    const recipients = await mg.domains.domainCredentials(sandboxDomain.name);
-    console.log("Current authorized recipients:", recipients);
-
-    // Add authorized recipient if not already present
-    await ensureAuthorizedRecipient(sandboxDomain.name);
-
     console.log("Setting up email routes...");
     await setupEmailRoutes();
+    await ensureAuthorizedRecipient(sandboxDomain.name);
     console.log("Mailgun configuration completed successfully");
   } catch (error) {
     console.error("Error verifying Mailgun setup:", error);
