@@ -1,32 +1,17 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
-import { contents, users, type Content } from "@db/schema";
+import { contents, type Content } from "@db/schema";
 import { eq, desc } from "drizzle-orm";
 import { summarizeContent } from "./openai";
-import { setupMailgun, generateForwardingEmail } from "./mailgun";
+import { setupMailgun } from "./mailgun";
 import { textToSpeech } from "./tts";
 
 export function registerRoutes(app: Express): Server {
-  // Generate a test email address
-  app.get("/api/test-email", async (_req, res) => {
-    try {
-      // Generate a test email address with ID 999 (for testing purposes)
-      const testEmail = await generateForwardingEmail(999);
-      res.json({ 
-        email: testEmail,
-        instructions: "Send an email to this address to test the email processing functionality"
-      });
-    } catch (error) {
-      console.error("Error generating test email:", error);
-      res.status(500).json({ error: "Failed to generate test email address" });
-    }
-  });
-
   // Email webhook endpoint for Mailgun
   app.post("/api/email/incoming", async (req, res) => {
     try {
-      console.log("Received email webhook:", req.body);
+      console.log("Received email webhook:", JSON.stringify(req.body, null, 2));
 
       // Extract email data from Mailgun webhook payload
       const {
@@ -46,13 +31,13 @@ export function registerRoutes(app: Express): Server {
       }
 
       // For test emails, we'll use a default user ID
-      const userId = recipient.includes('user-999-') ? 999 : null;
+      const userId = 999; // Using test user ID
 
       // Create content entry
       const [content] = await db
         .insert(contents)
         .values({
-          userId: userId || 1, // Use 1 as fallback for testing
+          userId,
           title: subject || "Untitled",
           originalContent: contentToProcess,
           sourceEmail: sender,
@@ -79,7 +64,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Get all contents for the current user
-  app.get("/api/contents", async (req, res) => {
+  app.get("/api/contents", async (_req, res) => {
     try {
       const allContents = await db
         .select()
@@ -92,26 +77,6 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({
         error: "Internal server error",
         message: "Failed to fetch contents"
-      });
-    }
-  });
-
-  // RSS feed generation endpoint
-  app.get("/api/feed", async (req, res) => {
-    try {
-      const userContents = await db
-        .select()
-        .from(contents)
-        .orderBy(desc(contents.createdAt))
-        .limit(50);
-
-      const feed = generateRSSFeed(userContents);
-      res.type("application/xml").send(feed);
-    } catch (error) {
-      console.error("Error generating RSS feed:", error);
-      res.status(500).json({
-        error: "Internal server error",
-        message: "Failed to generate RSS feed"
       });
     }
   });
@@ -161,43 +126,4 @@ async function processContent(contentId: number) {
     console.error("Error processing content:", error);
     throw error;
   }
-}
-
-interface Content {
-  id: number;
-  userId: number;
-  title: string;
-  originalContent: string;
-  summary?: string;
-  audioUrl?: string;
-  isProcessed: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-function generateRSSFeed(contents: Content[]): string {
-  const items = contents
-    .map(
-      (content) => `
-      <item>
-        <title>${content.title}</title>
-        <description>${content.summary ? JSON.stringify(content.summary) : ''}</description>
-        ${content.audioUrl ? `<enclosure url="${content.audioUrl}" type="audio/mpeg" length="0"/>` : ''}
-        <pubDate>${new Date(content.createdAt).toUTCString()}</pubDate>
-        <guid isPermaLink="false">${content.id}</guid>
-      </item>
-    `,
-    )
-    .join("");
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-    <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
-      <channel>
-        <title>Your Audio Content</title>
-        <link>${process.env.PUBLIC_WEBHOOK_URL}</link>
-        <description>Your personalized audio content feed</description>
-        <language>en-us</language>
-        ${items}
-      </channel>
-    </rss>`;
 }
