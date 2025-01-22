@@ -33,60 +33,26 @@ async function verifyDomainSetup() {
     const domainsList = Array.isArray(domains) ? domains : domains.items || [];
     console.log(`Found ${domainsList.length} domains in Mailgun account`);
 
-    // Find sandbox domain (reverting back to sandbox for development)
-    const sandboxDomain = domainsList.find(d => d.type === 'sandbox');
-    if (!sandboxDomain) {
-      console.error("No sandbox domain found in Mailgun account");
+    // Find speasy.app domain
+    const customDomain = domainsList.find(d => d.name === 'speasy.app');
+    if (!customDomain) {
+      console.error("speasy.app domain not found in Mailgun account");
       return;
     }
 
-    console.log("Using sandbox domain:", sandboxDomain.name);
-    process.env.MAILGUN_DOMAIN = sandboxDomain.name;
+    console.log("Using custom domain:", customDomain.name);
+    process.env.MAILGUN_DOMAIN = customDomain.name;
 
-    // Get the authorized recipients for the sandbox domain
+    // Get DNS records for verification
+    const domainInfo = await mg.domains.get(customDomain.name);
+    console.log("Domain DNS records:", JSON.stringify(domainInfo.receiving_dns_records, null, 2));
+
     console.log("Setting up email routes...");
     await setupEmailRoutes();
-    await ensureAuthorizedRecipient(sandboxDomain.name);
     console.log("Mailgun configuration completed successfully");
   } catch (error) {
     console.error("Error verifying Mailgun setup:", error);
     throw error;
-  }
-}
-
-async function ensureAuthorizedRecipient(domain: string) {
-  try {
-    const testEmail = `test@${domain}`;
-    console.log(`Setting up authorized recipient: ${testEmail}`);
-
-    // Using the REST API directly as the SDK method might not be available
-    const url = `https://api.mailgun.net/v3/domains/${domain}/credentials`;
-    const auth = Buffer.from(`api:${process.env.MAILGUN_API_KEY}`).toString('base64');
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        login: testEmail,
-        password: 'testpass123'
-      })
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      console.log("Authorization response:", response.status, text);
-      if (!text.includes('already exists')) {
-        throw new Error(`Failed to authorize recipient: ${response.status} ${text}`);
-      }
-    }
-
-    console.log("Authorized recipient setup completed");
-  } catch (error) {
-    console.error("Error setting up authorized recipient:", error);
-    // Continue execution as the recipient might already be authorized
   }
 }
 
@@ -111,7 +77,7 @@ async function setupEmailRoutes() {
 
     console.log("Creating new route for email forwarding...");
     const routeConfig = {
-      expression: `match_recipient("test@${process.env.MAILGUN_DOMAIN}")`,
+      expression: `match_recipient(".*@${process.env.MAILGUN_DOMAIN}")`,
       action: [
         `forward("${webhookUrl}")`,
         "store()",
@@ -136,8 +102,9 @@ async function setupEmailRoutes() {
 }
 
 export async function generateForwardingEmail(_userId: number): Promise<string> {
-  // For testing, use the authorized test recipient
-  const email = `test@${process.env.MAILGUN_DOMAIN}`;
+  // Generate a random string for unique email addresses
+  const randomString = Math.random().toString(36).substring(2, 15);
+  const email = `${randomString}@${process.env.MAILGUN_DOMAIN}`;
   console.log(`Generated forwarding email: ${email}`);
   return email;
 }
