@@ -77,8 +77,11 @@ async function setupEmailRoutes() {
 
     console.log("Creating new route for email forwarding...");
     const routeConfig = {
-      expression: `catch_all()`,  // Match all incoming emails
-      action: [`forward("${webhookUrl}")`, "stop()"],
+      expression: `catch_all()`,  // Use catch_all() to match all incoming emails
+      action: [
+        `forward("${webhookUrl}")`,
+        "stop()"
+      ],
       description: "Forward all incoming emails to our API",
       priority: 0
     };
