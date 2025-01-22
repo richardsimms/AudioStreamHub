@@ -47,9 +47,27 @@ async function verifyDomainSetup() {
     }
 
     console.log("Domain found:", JSON.stringify(domain, null, 2));
+
+    // Check domain verification status
+    if (domain.state !== 'active') {
+      console.error(`Domain ${process.env.MAILGUN_DOMAIN} is not active. Current state: ${domain.state}`);
+      console.error("Please verify your domain in the Mailgun dashboard");
+      return;
+    }
+
+    // Try to get domain credentials
+    try {
+      const credentials = await mg.domains.getCredentials(process.env.MAILGUN_DOMAIN!);
+      console.log("Domain credentials retrieved successfully");
+    } catch (error) {
+      console.error("Error retrieving domain credentials:", error);
+      console.error("This might indicate insufficient permissions or incomplete domain setup");
+      return;
+    }
+
     console.log("Setting up email routes...");
     await setupEmailRoutes();
-    console.log("Mailgun setup completed");
+    console.log("Mailgun configuration completed");
   } catch (error) {
     console.error("Error verifying Mailgun setup:", error);
     throw error;
@@ -58,7 +76,6 @@ async function verifyDomainSetup() {
 
 async function setupEmailRoutes() {
   try {
-    // Ensure we have a valid webhook URL
     if (!process.env.PUBLIC_WEBHOOK_URL) {
       throw new Error("PUBLIC_WEBHOOK_URL environment variable is not set");
     }
@@ -85,7 +102,11 @@ async function setupEmailRoutes() {
     console.log("Creating new route for email forwarding...");
     const routeConfig = {
       expression: `match_recipient(".*@${process.env.MAILGUN_DOMAIN}")`,
-      action: [`forward("${webhookUrl}")`, "stop()"],
+      action: [
+        `forward("${webhookUrl}")`,
+        "store()",  // Store the message for potential debugging
+        "stop()"
+      ],
       description: "Forward all incoming emails to our API",
       priority: 0
     };
@@ -105,8 +126,9 @@ async function setupEmailRoutes() {
 }
 
 export async function generateForwardingEmail(userId: number): Promise<string> {
+  // Use a subdomain-based approach for better deliverability
   const timestamp = Date.now();
-  return `user.${userId}.${timestamp}@${process.env.MAILGUN_DOMAIN}`;
+  return `user-${userId}-${timestamp}@${process.env.MAILGUN_DOMAIN}`;
 }
 
 export async function validateEmail(email: string): Promise<boolean> {
