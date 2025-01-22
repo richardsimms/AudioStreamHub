@@ -33,18 +33,15 @@ async function verifyDomainSetup() {
     const domainsList = Array.isArray(domains) ? domains : domains.items || [];
     console.log(`Found ${domainsList.length} domains in Mailgun account`);
 
-    // Find sandbox domain
-    const sandboxDomain = domainsList.find(d => d.type === 'sandbox');
-    if (!sandboxDomain) {
-      console.error("No sandbox domain found in Mailgun account");
+    // Find speasy.app domain
+    const customDomain = domainsList.find(d => d.name === 'speasy.app');
+    if (!customDomain) {
+      console.error("Custom domain speasy.app not found in Mailgun account");
       return;
     }
 
-    console.log("Using sandbox domain:", sandboxDomain.name);
-    process.env.MAILGUN_DOMAIN = sandboxDomain.name;
-
-    // For sandbox domains, we need to authorize recipients
-    await authorizeTestRecipient();
+    console.log("Domain found:", JSON.stringify(customDomain, null, 2));
+    process.env.MAILGUN_DOMAIN = customDomain.name;
 
     console.log("Setting up email routes...");
     await setupEmailRoutes();
@@ -52,35 +49,6 @@ async function verifyDomainSetup() {
   } catch (error) {
     console.error("Error verifying Mailgun setup:", error);
     throw error;
-  }
-}
-
-async function authorizeTestRecipient() {
-  try {
-    const testEmail = `user-999@${process.env.MAILGUN_DOMAIN}`;
-    console.log(`Authorizing test recipient: ${testEmail}`);
-
-    // Add the test email as an authorized recipient using POST request
-    const response = await fetch(`https://api.mailgun.net/v3/domains/${process.env.MAILGUN_DOMAIN}/credentials`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${Buffer.from(`api:${process.env.MAILGUN_API_KEY}`).toString('base64')}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        login: testEmail,
-        password: 'test123' // This password isn't used since we're forwarding emails
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to authorize recipient: ${response.status} ${response.statusText}`);
-    }
-
-    console.log("Successfully authorized test recipient");
-  } catch (error) {
-    console.error("Error authorizing test recipient:", error);
-    // Continue even if authorization fails, as the recipient might already be authorized
   }
 }
 
