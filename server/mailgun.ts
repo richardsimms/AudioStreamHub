@@ -18,7 +18,7 @@ export function setupMailgun() {
   mg = mailgun.client({
     username: 'api',
     key: process.env.MAILGUN_API_KEY,
-    url: 'https://api.mailgun.net'
+    url: 'https://api.mailgun.net',
   });
 
   // Verify domain and routes setup
@@ -45,12 +45,7 @@ async function verifyDomainSetup() {
     const domain = domainsList.find(d => d.name === process.env.MAILGUN_DOMAIN);
 
     if (!domain) {
-      console.error(`Domain ${process.env.MAILGUN_DOMAIN} not found in Mailgun account.
-Please add this domain in your Mailgun dashboard:
-1. Go to Sending → Domains
-2. Click "Add New Domain"
-3. Enter your domain name
-4. Follow the DNS setup instructions`);
+      console.error(`Domain ${process.env.MAILGUN_DOMAIN} not found in Mailgun account`);
       return;
     }
 
@@ -58,8 +53,8 @@ Please add this domain in your Mailgun dashboard:
 
     // Since we can't directly fetch DNS records through the API,
     // provide instructions for manual DNS setup
-    console.error(`
-Please add these DNS records for your domain:
+    console.log(`
+Please verify these DNS records are set for your domain:
 1. SPF Record (TXT):
    - Name: @
    - Value: v=spf1 include:mailgun.org ~all
@@ -76,7 +71,6 @@ Please add these DNS records for your domain:
 
     console.log("Setting up email routes...");
     await setupEmailRoutes();
-    console.log("Mailgun configuration completed successfully");
   } catch (error) {
     console.error("Error verifying Mailgun setup:", error);
     if (error instanceof Error) {
@@ -88,6 +82,14 @@ Please add these DNS records for your domain:
 
 async function setupEmailRoutes() {
   try {
+    // Ensure we have a valid webhook URL
+    if (!process.env.PUBLIC_WEBHOOK_URL) {
+      throw new Error("PUBLIC_WEBHOOK_URL environment variable is not set");
+    }
+
+    const webhookUrl = new URL('/api/email/incoming', process.env.PUBLIC_WEBHOOK_URL).toString();
+    console.log("Using webhook URL:", webhookUrl);
+
     console.log("Fetching existing Mailgun routes...");
     const routes = await mg.routes.list();
     console.log("Routes response:", JSON.stringify(routes, null, 2));
@@ -95,32 +97,15 @@ async function setupEmailRoutes() {
     const routesList = Array.isArray(routes) ? routes : routes.items || [];
     console.log(`Found ${routesList.length} existing routes`);
 
-    // Delete any existing routes for our domain to ensure clean setup
+    // Delete any existing routes for our domain
     for (const route of routesList) {
       if (route.expression.includes(process.env.MAILGUN_DOMAIN!)) {
+        console.log(`Deleting existing route: ${route.id}`);
         await mg.routes.destroy(route.id);
       }
     }
 
-    // Check if we have a public webhook URL
-    if (!process.env.PUBLIC_WEBHOOK_URL) {
-      console.error(`
-Error: PUBLIC_WEBHOOK_URL environment variable is not set.
-Mailgun requires a publicly accessible webhook URL to forward emails.
-
-For development, you can use a service like ngrok to expose your local server:
-1. Install ngrok: npm install -g ngrok
-2. Run: ngrok http 5000
-3. Copy the HTTPS URL and set it as PUBLIC_WEBHOOK_URL environment variable
-4. Restart the application
-
-For production, set PUBLIC_WEBHOOK_URL to your actual domain.
-`);
-      return;
-    }
-
     console.log("Creating new route for email forwarding...");
-    const webhookUrl = `${process.env.PUBLIC_WEBHOOK_URL}/api/email/incoming`;
     const routeConfig = {
       expression: `match_recipient(".*@${process.env.MAILGUN_DOMAIN}")`,
       action: [
@@ -133,11 +118,12 @@ For production, set PUBLIC_WEBHOOK_URL to your actual domain.
     };
 
     console.log("Route configuration:", JSON.stringify(routeConfig, null, 2));
+    const newRoute = await mg.routes.create(routeConfig);
+    console.log("Successfully created new route:", JSON.stringify(newRoute, null, 2));
 
-    await mg.routes.create(routeConfig);
-    console.log("Successfully created new Mailgun route for email forwarding");
   } catch (error) {
     console.error("Error managing Mailgun routes:", error);
+
     if (error instanceof Error) {
       console.error("Error details:", error.message);
       console.error("Error stack:", error.stack);
@@ -147,9 +133,10 @@ For production, set PUBLIC_WEBHOOK_URL to your actual domain.
       console.error(`
 Error: Webhook URL must be publicly accessible.
 Please make sure your PUBLIC_WEBHOOK_URL environment variable points to a publicly accessible URL.
-Local development URLs (localhost) will not work with Mailgun webhooks.
 `);
     }
+
+    throw error; // Re-throw to be caught by the caller
   }
 }
 
