@@ -5,10 +5,14 @@ import type { Mailgun as MailgunClient } from "mailgun.js";
 let mg: MailgunClient;
 
 export function setupMailgun() {
+  console.log("Starting Mailgun setup...");
+
   if (!process.env.MAILGUN_API_KEY || !process.env.MAILGUN_DOMAIN) {
-    console.error("Mailgun API key or domain not set");
+    console.error("Mailgun configuration error: MAILGUN_API_KEY or MAILGUN_DOMAIN environment variables are not set");
     return;
   }
+
+  console.log(`Attempting to configure Mailgun for domain: ${process.env.MAILGUN_DOMAIN}`);
 
   const mailgun = new Mailgun(formData);
   mg = mailgun.client({
@@ -17,13 +21,23 @@ export function setupMailgun() {
   });
 
   // Verify domain and routes setup
-  verifyDomainSetup().catch(console.error);
+  verifyDomainSetup().catch(error => {
+    console.error("Failed to verify Mailgun domain setup:", error);
+  });
 }
 
 async function verifyDomainSetup() {
   try {
-    // First verify the domain exists and is configured
+    console.log("Fetching Mailgun domains...");
     const domains = await mg.domains.list();
+
+    if (!domains || !domains.items) {
+      console.error("Error: Unable to fetch domains from Mailgun. Response:", domains);
+      return;
+    }
+
+    console.log(`Found ${domains.items.length} domains in Mailgun account`);
+
     const domain = domains.items.find(d => d.name === process.env.MAILGUN_DOMAIN);
 
     if (!domain) {
@@ -36,8 +50,12 @@ Please add this domain in your Mailgun dashboard:
       return;
     }
 
+    console.log("Domain found, checking DNS records...");
+
     // Check DNS records verification status
     const dnsRecords = await mg.domains.getDomainRecords(process.env.MAILGUN_DOMAIN!);
+    console.log("DNS Records:", JSON.stringify(dnsRecords, null, 2));
+
     const unverifiedRecords = dnsRecords.receiving_dns_records.filter(record => !record.valid) || [];
 
     if (unverifiedRecords.length > 0) {
@@ -62,23 +80,39 @@ Please verify your domain in the Mailgun dashboard:
       return;
     }
 
+    console.log("Domain is verified, setting up email routes...");
+
     // Then set up the routes if domain is verified
     await setupEmailRoutes();
     console.log("Mailgun configuration completed successfully");
   } catch (error) {
     console.error("Error verifying Mailgun setup:", error);
+    if (error instanceof Error) {
+      console.error("Error details:", error.message);
+      console.error("Error stack:", error.stack);
+    }
   }
 }
 
 async function setupEmailRoutes() {
   try {
+    console.log("Fetching existing Mailgun routes...");
     const routes = await mg.routes.list();
+
+    if (!routes || !routes.items) {
+      console.error("Error: Unable to fetch routes from Mailgun. Response:", routes);
+      return;
+    }
+
+    console.log(`Found ${routes.items.length} existing routes`);
+
     const existingRoute = routes.items.find(route => 
       route.expression.includes(process.env.MAILGUN_DOMAIN!)
     );
 
     if (!existingRoute) {
-      await mg.routes.create({
+      console.log("Creating new route for email forwarding...");
+      const routeConfig = {
         expression: `match_recipient(".*@${process.env.MAILGUN_DOMAIN}")`,
         action: [
           `forward("${process.env.APP_URL || 'http://localhost:5000'}/api/email/incoming")`,
@@ -87,13 +121,21 @@ async function setupEmailRoutes() {
         ],
         description: "Forward incoming emails to API endpoint",
         priority: 10
-      });
-      console.log("Created new Mailgun route for email forwarding");
+      };
+
+      console.log("Route configuration:", JSON.stringify(routeConfig, null, 2));
+
+      await mg.routes.create(routeConfig);
+      console.log("Successfully created new Mailgun route for email forwarding");
     } else {
-      console.log("Existing Mailgun route found");
+      console.log("Existing Mailgun route found:", JSON.stringify(existingRoute, null, 2));
     }
   } catch (error) {
     console.error("Error managing Mailgun routes:", error);
+    if (error instanceof Error) {
+      console.error("Error details:", error.message);
+      console.error("Error stack:", error.stack);
+    }
   }
 }
 
