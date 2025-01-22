@@ -71,7 +71,15 @@ async function setupEmailRoutes() {
       await mg.routes.destroy(route.id);
     }
 
-    const webhookBaseUrl = process.env.PUBLIC_WEBHOOK_URL;
+    if (!process.env.PUBLIC_WEBHOOK_URL) {
+      throw new Error("PUBLIC_WEBHOOK_URL environment variable is not set");
+    }
+
+    // Ensure webhook URL has proper protocol
+    let webhookBaseUrl = process.env.PUBLIC_WEBHOOK_URL;
+    if (!webhookBaseUrl.startsWith('http')) {
+      webhookBaseUrl = `https://${webhookBaseUrl}`;
+    }
     const webhookUrl = `${webhookBaseUrl}/api/email/incoming`;
     console.log("Using webhook URL:", webhookUrl);
 
