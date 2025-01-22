@@ -58,6 +58,10 @@ async function verifyDomainSetup() {
 
 async function setupEmailRoutes() {
   try {
+    if (!process.env.PUBLIC_WEBHOOK_URL) {
+      throw new Error("PUBLIC_WEBHOOK_URL environment variable is not set");
+    }
+
     console.log("Fetching existing Mailgun routes...");
     const routes = await mg.routes.list();
     console.log("Routes response:", JSON.stringify(routes, null, 2));
@@ -71,16 +75,8 @@ async function setupEmailRoutes() {
       await mg.routes.destroy(route.id);
     }
 
-    if (!process.env.PUBLIC_WEBHOOK_URL) {
-      throw new Error("PUBLIC_WEBHOOK_URL environment variable is not set");
-    }
-
-    // Ensure webhook URL has proper protocol
-    let webhookBaseUrl = process.env.PUBLIC_WEBHOOK_URL;
-    if (!webhookBaseUrl.startsWith('http')) {
-      webhookBaseUrl = `https://${webhookBaseUrl}`;
-    }
-    const webhookUrl = `${webhookBaseUrl}/api/email/incoming`;
+    // Ensure webhook URL is properly formatted with https://
+    const webhookUrl = new URL("/api/email/incoming", process.env.PUBLIC_WEBHOOK_URL).toString();
     console.log("Using webhook URL:", webhookUrl);
 
     console.log("Creating new route for email forwarding...");
