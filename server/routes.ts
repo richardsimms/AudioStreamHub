@@ -11,23 +11,47 @@ export function registerRoutes(app: Express): Server {
   // Email webhook endpoint for Mailgun
   app.post("/api/email/incoming", async (req, res) => {
     try {
-      const { from, subject, "body-plain": body } = req.body;
-      
+      // Extract email data from Mailgun webhook payload
+      const {
+        sender: from,
+        subject,
+        "body-plain": body,
+        recipient: to,
+        "stripped-text": strippedText,
+      } = req.body;
+
+      // Use stripped text if available, otherwise fallback to body
+      const contentToProcess = strippedText || body;
+
+      if (!contentToProcess) {
+        console.error("No content found in email");
+        return res.status(400).send("No content found in email");
+      }
+
       // Create content entry
       const [content] = await db.insert(contents).values({
-        title: subject,
-        originalContent: body,
+        title: subject || "Untitled",
+        originalContent: contentToProcess,
         sourceEmail: from,
         isProcessed: false,
       }).returning();
 
       // Process content asynchronously
-      processContent(content.id).catch(console.error);
+      processContent(content.id).catch(error => {
+        console.error("Error processing content:", error);
+      });
 
-      res.status(200).send("OK");
+      // Respond to Mailgun webhook
+      res.status(200).json({
+        message: "Email received and queued for processing",
+        contentId: content.id
+      });
     } catch (error) {
       console.error("Error processing email:", error);
-      res.status(500).send("Internal Server Error");
+      res.status(500).json({
+        error: "Internal server error",
+        message: "Failed to process incoming email"
+      });
     }
   });
 
@@ -37,7 +61,11 @@ export function registerRoutes(app: Express): Server {
       const allContents = await db.select().from(contents);
       res.json(allContents);
     } catch (error) {
-      res.status(500).send("Failed to fetch contents");
+      console.error("Error fetching contents:", error);
+      res.status(500).json({
+        error: "Internal server error",
+        message: "Failed to fetch contents"
+      });
     }
   });
 
@@ -47,7 +75,11 @@ export function registerRoutes(app: Express): Server {
       const allPlaylists = await db.select().from(playlists);
       res.json(allPlaylists);
     } catch (error) {
-      res.status(500).send("Failed to fetch playlists");
+      console.error("Error fetching playlists:", error);
+      res.status(500).json({
+        error: "Internal server error",
+        message: "Failed to fetch playlists"
+      });
     }
   });
 
@@ -66,7 +98,11 @@ export function registerRoutes(app: Express): Server {
 
       res.json(items.map(item => item.content));
     } catch (error) {
-      res.status(500).send("Failed to fetch playlist contents");
+      console.error("Error fetching playlist contents:", error);
+      res.status(500).json({
+        error: "Internal server error",
+        message: "Failed to fetch playlist contents"
+      });
     }
   });
 
@@ -83,29 +119,43 @@ export function registerRoutes(app: Express): Server {
       const feed = generateRSSFeed(userContents);
       res.type("application/xml").send(feed);
     } catch (error) {
-      res.status(500).send("Failed to generate RSS feed");
+      console.error("Error generating RSS feed:", error);
+      res.status(500).json({
+        error: "Internal server error",
+        message: "Failed to generate RSS feed"
+      });
     }
   });
 
   const httpServer = createServer(app);
+
+  setupMailgun();
   return httpServer;
 }
 
 async function processContent(contentId: number) {
   try {
+    // Fetch the content to process
     const [content] = await db
       .select()
       .from(contents)
       .where(eq(contents.id, contentId))
       .limit(1);
 
-    if (!content) return;
+    if (!content) {
+      console.error("Content not found:", contentId);
+      return;
+    }
+
+    console.log(`Processing content ${contentId}: ${content.title}`);
 
     // Generate summary with OpenAI
     const summary = await summarizeContent(content.originalContent);
+    console.log(`Generated summary for content ${contentId}`);
 
     // Generate audio with TTS
     const audioUrl = await textToSpeech(content.originalContent);
+    console.log(`Generated audio for content ${contentId}`);
 
     // Update content with summary and audio URL
     await db
@@ -117,8 +167,11 @@ async function processContent(contentId: number) {
         updatedAt: new Date(),
       })
       .where(eq(contents.id, contentId));
+
+    console.log(`Successfully processed content ${contentId}`);
   } catch (error) {
     console.error("Error processing content:", error);
+    throw error;
   }
 }
 
@@ -128,23 +181,23 @@ function generateRSSFeed(contents: any[]): string {
       (content) => `
       <item>
         <title>${content.title}</title>
-        <enclosure url="${content.audioUrl}" type="audio/mpeg"/>
+        <description>${content.summary ? JSON.stringify(content.summary) : ''}</description>
+        <enclosure url="${content.audioUrl}" type="audio/mpeg" length="0"/>
         <pubDate>${new Date(content.createdAt).toUTCString()}</pubDate>
-        <guid>${content.id}</guid>
+        <guid isPermaLink="false">${content.id}</guid>
       </item>
     `,
     )
     .join("");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-    <rss version="2.0">
+    <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
       <channel>
         <title>Your Audio Content</title>
-        <link>https://yourdomain.com</link>
+        <link>${process.env.APP_URL || 'http://localhost:5000'}</link>
         <description>Your personalized audio content feed</description>
+        <language>en-us</language>
         ${items}
       </channel>
     </rss>`;
 }
-
-setupMailgun();
