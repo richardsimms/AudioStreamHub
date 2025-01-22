@@ -75,8 +75,12 @@ async function setupEmailRoutes() {
       await mg.routes.destroy(route.id);
     }
 
-    // Ensure webhook URL is properly formatted
+    // Validate and format webhook URL
     let webhookUrl = process.env.PUBLIC_WEBHOOK_URL;
+    // Ensure URL has protocol
+    if (!webhookUrl.startsWith('http://') && !webhookUrl.startsWith('https://')) {
+      webhookUrl = `https://${webhookUrl}`;
+    }
     // Remove trailing slash if present
     webhookUrl = webhookUrl.replace(/\/$/, '');
     // Append the email endpoint path
