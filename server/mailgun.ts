@@ -75,30 +75,30 @@ async function setupEmailRoutes() {
     const routesList = Array.isArray(routes) ? routes : routes.items || [];
     console.log(`Found ${routesList.length} existing routes`);
 
-    const existingRoute = routesList.find(route => 
-      route.expression.includes(process.env.MAILGUN_DOMAIN!)
-    );
-
-    if (!existingRoute) {
-      console.log("Creating new route for email forwarding...");
-      const routeConfig = {
-        expression: `match_recipient(".*@${process.env.MAILGUN_DOMAIN}")`,
-        action: [
-          `forward("${process.env.APP_URL || 'http://localhost:5000'}/api/email/incoming")`,
-          "store()",
-          "stop()"
-        ],
-        description: "Forward all incoming emails to our API",
-        priority: 0
-      };
-
-      console.log("Route configuration:", JSON.stringify(routeConfig, null, 2));
-
-      await mg.routes.create(routeConfig);
-      console.log("Successfully created new Mailgun route for email forwarding");
-    } else {
-      console.log("Existing Mailgun route found:", JSON.stringify(existingRoute, null, 2));
+    // Delete any existing routes for our domain to ensure clean setup
+    for (const route of routesList) {
+      if (route.expression.includes(process.env.MAILGUN_DOMAIN!)) {
+        await mg.routes.destroy(route.id);
+      }
     }
+
+    console.log("Creating new route for email forwarding...");
+    const appUrl = process.env.APP_URL || 'http://localhost:5000';
+    const routeConfig = {
+      expression: `match_recipient(".*@${process.env.MAILGUN_DOMAIN}")`,
+      action: [
+        `forward("${appUrl}/api/email/incoming")`,
+        "store()",
+        "stop()"
+      ],
+      description: "Forward all incoming emails to our API",
+      priority: 0
+    };
+
+    console.log("Route configuration:", JSON.stringify(routeConfig, null, 2));
+
+    await mg.routes.create(routeConfig);
+    console.log("Successfully created new Mailgun route for email forwarding");
   } catch (error) {
     console.error("Error managing Mailgun routes:", error);
     if (error instanceof Error) {
