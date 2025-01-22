@@ -48,7 +48,7 @@ async function verifyDomainSetup() {
 
     console.log("Setting up email routes...");
     await setupEmailRoutes();
-    console.log("Mailgun configuration completed");
+    console.log("Mailgun configuration completed successfully");
   } catch (error) {
     console.error("Error verifying Mailgun setup:", error);
     throw error;
@@ -60,11 +60,22 @@ async function authorizeTestRecipient() {
     const testEmail = `user-999@${process.env.MAILGUN_DOMAIN}`;
     console.log(`Authorizing test recipient: ${testEmail}`);
 
-    // Add the test email as an authorized recipient
-    await mg.domains.createCredential(process.env.MAILGUN_DOMAIN!, {
-      login: testEmail,
-      password: 'test123' // This password isn't used since we're forwarding emails
+    // Add the test email as an authorized recipient using POST request
+    const response = await fetch(`https://api.mailgun.net/v3/domains/${process.env.MAILGUN_DOMAIN}/credentials`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${Buffer.from(`api:${process.env.MAILGUN_API_KEY}`).toString('base64')}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        login: testEmail,
+        password: 'test123' // This password isn't used since we're forwarding emails
+      })
     });
+
+    if (!response.ok) {
+      throw new Error(`Failed to authorize recipient: ${response.status} ${response.statusText}`);
+    }
 
     console.log("Successfully authorized test recipient");
   } catch (error) {
@@ -122,8 +133,6 @@ async function setupEmailRoutes() {
 }
 
 export async function generateForwardingEmail(userId: number): Promise<string> {
-  const timestamp = Date.now();
-  // For sandbox domains, we need to use a consistent recipient pattern
   const email = `user-${userId}@${process.env.MAILGUN_DOMAIN}`;
   console.log(`Generated forwarding email: ${email}`);
   return email;
