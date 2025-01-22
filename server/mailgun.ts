@@ -7,12 +7,10 @@ let mg: MailgunClient;
 export function setupMailgun() {
   console.log("Starting Mailgun setup...");
 
-  if (!process.env.MAILGUN_API_KEY || !process.env.MAILGUN_DOMAIN) {
-    console.error("Mailgun configuration error: MAILGUN_API_KEY or MAILGUN_DOMAIN environment variables are not set");
+  if (!process.env.MAILGUN_API_KEY) {
+    console.error("Mailgun configuration error: MAILGUN_API_KEY environment variable is not set");
     return;
   }
-
-  console.log(`Attempting to configure Mailgun for domain: ${process.env.MAILGUN_DOMAIN}`);
 
   const mailgun = new Mailgun(FormData);
   mg = mailgun.client({
@@ -22,7 +20,7 @@ export function setupMailgun() {
 
   // Verify domain and routes setup
   verifyDomainSetup().catch(error => {
-    console.error("Failed to verify Mailgun domain setup:", error);
+    console.error("Failed to verify Mailgun setup:", error);
   });
 }
 
@@ -32,38 +30,18 @@ async function verifyDomainSetup() {
     const domains = await mg.domains.list();
     console.log("Domains response:", JSON.stringify(domains, null, 2));
 
-    if (!domains) {
-      console.error("Error: No domains response from Mailgun");
-      return;
-    }
-
     const domainsList = Array.isArray(domains) ? domains : domains.items || [];
     console.log(`Found ${domainsList.length} domains in Mailgun account`);
 
-    const domain = domainsList.find(d => d.name === process.env.MAILGUN_DOMAIN);
-    if (!domain) {
-      console.error(`Domain ${process.env.MAILGUN_DOMAIN} not found in Mailgun account`);
+    // Find sandbox domain
+    const sandboxDomain = domainsList.find(d => d.type === 'sandbox');
+    if (!sandboxDomain) {
+      console.error("No sandbox domain found in Mailgun account");
       return;
     }
 
-    console.log("Domain found:", JSON.stringify(domain, null, 2));
-
-    // Check domain verification status
-    if (domain.state !== 'active') {
-      console.error(`Domain ${process.env.MAILGUN_DOMAIN} is not active. Current state: ${domain.state}`);
-      console.error("Please verify your domain in the Mailgun dashboard");
-      return;
-    }
-
-    // Try to get domain credentials
-    try {
-      const credentials = await mg.domains.getCredentials(process.env.MAILGUN_DOMAIN!);
-      console.log("Domain credentials retrieved successfully");
-    } catch (error) {
-      console.error("Error retrieving domain credentials:", error);
-      console.error("This might indicate insufficient permissions or incomplete domain setup");
-      return;
-    }
+    console.log("Using sandbox domain:", sandboxDomain.name);
+    process.env.MAILGUN_DOMAIN = sandboxDomain.name;
 
     console.log("Setting up email routes...");
     await setupEmailRoutes();
@@ -104,7 +82,7 @@ async function setupEmailRoutes() {
       expression: `match_recipient(".*@${process.env.MAILGUN_DOMAIN}")`,
       action: [
         `forward("${webhookUrl}")`,
-        "store()",  // Store the message for potential debugging
+        "store()",
         "stop()"
       ],
       description: "Forward all incoming emails to our API",
@@ -126,7 +104,6 @@ async function setupEmailRoutes() {
 }
 
 export async function generateForwardingEmail(userId: number): Promise<string> {
-  // Use a subdomain-based approach for better deliverability
   const timestamp = Date.now();
   return `user-${userId}-${timestamp}@${process.env.MAILGUN_DOMAIN}`;
 }
