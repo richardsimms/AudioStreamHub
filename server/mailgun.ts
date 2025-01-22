@@ -65,19 +65,19 @@ async function setupEmailRoutes() {
     const routesList = Array.isArray(routes) ? routes : routes.items || [];
     console.log(`Found ${routesList.length} existing routes`);
 
-    // Delete ALL existing routes to stay within quota
+    // Delete ALL existing routes
     for (const route of routesList) {
       console.log(`Deleting route: ${route.id}`);
       await mg.routes.destroy(route.id);
     }
 
-    const webhookBaseUrl = "https://7618ae55-dcd1-4178-8a15-04009091ee27-00-q5sdxm13xgps.riker.replit.dev";
+    const webhookBaseUrl = process.env.PUBLIC_WEBHOOK_URL;
     const webhookUrl = `${webhookBaseUrl}/api/email/incoming`;
     console.log("Using webhook URL:", webhookUrl);
 
     console.log("Creating new route for email forwarding...");
     const routeConfig = {
-      expression: `match_recipient(".*@${process.env.MAILGUN_DOMAIN}")`,
+      expression: `catch_all()`,  // Match all incoming emails
       action: [`forward("${webhookUrl}")`, "stop()"],
       description: "Forward all incoming emails to our API",
       priority: 0
@@ -99,7 +99,9 @@ async function setupEmailRoutes() {
 
 export async function generateForwardingEmail(userId: number): Promise<string> {
   const timestamp = Date.now();
-  return `user-${userId}-${timestamp}@${process.env.MAILGUN_DOMAIN}`;
+  const email = `user-${userId}-${timestamp}@${process.env.MAILGUN_DOMAIN}`;
+  console.log(`Generated forwarding email: ${email}`);
+  return email;
 }
 
 export async function validateEmail(email: string): Promise<boolean> {
