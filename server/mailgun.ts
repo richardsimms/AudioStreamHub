@@ -27,18 +27,43 @@ async function verifyDomainSetup() {
     const domain = domains.items.find(d => d.name === process.env.MAILGUN_DOMAIN);
 
     if (!domain) {
-      console.error("Domain not found in Mailgun account. Please verify domain setup.");
+      console.error(`Domain ${process.env.MAILGUN_DOMAIN} not found in Mailgun account.
+Please add this domain in your Mailgun dashboard:
+1. Go to Sending → Domains
+2. Click "Add New Domain"
+3. Enter your domain name
+4. Follow the DNS setup instructions`);
+      return;
+    }
+
+    // Check DNS records verification status
+    const dnsRecords = await mg.domains.getDomainRecords(process.env.MAILGUN_DOMAIN!);
+    const unverifiedRecords = dnsRecords.receiving_dns_records.filter(record => !record.valid) || [];
+
+    if (unverifiedRecords.length > 0) {
+      console.error(`
+Domain found but has unverified DNS records. Please add these DNS records:
+${unverifiedRecords.map(record => `
+Type: ${record.record_type}
+Name: ${record.name}
+Value: ${record.value}
+`).join('\n')}
+      `);
       return;
     }
 
     if (!domain.isVerified) {
-      console.error("Domain not verified. Please verify domain in Mailgun dashboard.");
+      console.error(`Domain ${process.env.MAILGUN_DOMAIN} exists but is not verified.
+Please verify your domain in the Mailgun dashboard:
+1. Go to Sending → Domains
+2. Click on your domain
+3. Check the "Domain Verification & DNS" section
+4. Add any missing DNS records`);
       return;
     }
 
-    // Then set up the routes
+    // Then set up the routes if domain is verified
     await setupEmailRoutes();
-
     console.log("Mailgun configuration completed successfully");
   } catch (error) {
     console.error("Error verifying Mailgun setup:", error);
@@ -61,6 +86,7 @@ async function setupEmailRoutes() {
           "stop()"
         ],
         description: "Forward incoming emails to API endpoint",
+        priority: 10
       });
       console.log("Created new Mailgun route for email forwarding");
     } else {
