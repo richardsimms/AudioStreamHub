@@ -1,4 +1,4 @@
-import formData from "form-data";
+import FormData from "form-data";
 import Mailgun from "mailgun.js";
 import type { Mailgun as MailgunClient } from "mailgun.js";
 
@@ -14,10 +14,11 @@ export function setupMailgun() {
 
   console.log(`Attempting to configure Mailgun for domain: ${process.env.MAILGUN_DOMAIN}`);
 
-  const mailgun = new Mailgun(formData);
+  const mailgun = new Mailgun(FormData);
   mg = mailgun.client({
-    username: "api",
+    username: 'api',
     key: process.env.MAILGUN_API_KEY,
+    url: 'https://api.mailgun.net'
   });
 
   // Verify domain and routes setup
@@ -54,13 +55,10 @@ Please add this domain in your Mailgun dashboard:
     }
 
     console.log("Domain found:", JSON.stringify(domain, null, 2));
-    console.log("Checking DNS records...");
 
-    try {
-      const dnsResponse = await mg.domains.getDNS(process.env.MAILGUN_DOMAIN!);
-      console.log("DNS Records:", JSON.stringify(dnsResponse, null, 2));
-
-      console.error(`
+    // Since we can't directly fetch DNS records through the API,
+    // provide instructions for manual DNS setup
+    console.error(`
 Please add these DNS records for your domain:
 1. SPF Record (TXT):
    - Name: @
@@ -74,14 +72,7 @@ Please add these DNS records for your domain:
    - Name: @
    - Value: mxa.mailgun.org (Priority 10)
    - Value: mxb.mailgun.org (Priority 10)
-      `);
-
-      return;
-    } catch (error) {
-      console.error("Error fetching DNS records:", error);
-      console.error("Please check your Mailgun dashboard for the required DNS records");
-      return;
-    }
+    `);
 
     console.log("Setting up email routes...");
     await setupEmailRoutes();
