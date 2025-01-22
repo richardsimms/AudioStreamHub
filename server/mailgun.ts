@@ -77,10 +77,6 @@ async function setupEmailRoutes() {
 
     // Validate and format webhook URL
     let webhookUrl = process.env.PUBLIC_WEBHOOK_URL;
-    // Ensure URL has protocol
-    if (!webhookUrl.startsWith('http://') && !webhookUrl.startsWith('https://')) {
-      webhookUrl = `https://${webhookUrl}`;
-    }
     // Remove trailing slash if present
     webhookUrl = webhookUrl.replace(/\/$/, '');
     // Append the email endpoint path
@@ -100,8 +96,20 @@ async function setupEmailRoutes() {
     };
 
     console.log("Route configuration:", JSON.stringify(routeConfig, null, 2));
-    const newRoute = await mg.routes.create(routeConfig);
-    console.log("Successfully created new route:", JSON.stringify(newRoute, null, 2));
+    try {
+      const newRoute = await mg.routes.create(routeConfig);
+      console.log("Successfully created new route:", JSON.stringify(newRoute, null, 2));
+    } catch (routeError) {
+      console.error("Failed to create route:", routeError);
+      // Attempt to create route with simplified configuration
+      const retryConfig = {
+        ...routeConfig,
+        action: [`forward("${webhookUrl}")`]
+      };
+      console.log("Retrying with simplified route configuration:", JSON.stringify(retryConfig, null, 2));
+      const newRoute = await mg.routes.create(retryConfig);
+      console.log("Successfully created simplified route:", JSON.stringify(newRoute, null, 2));
+    }
 
   } catch (error) {
     console.error("Error managing Mailgun routes:", error);
