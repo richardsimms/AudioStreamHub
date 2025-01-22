@@ -1,0 +1,89 @@
+Domains response: [
+  {
+    "name": "speasy.app",
+    "require_tls": false,
+    "skip_verification": false,
+    "state": "active",
+    "wildcard": false,
+    "spam_action": "disabled",
+    "created_at": "2025-01-22T03:41:30.000Z",
+    "smtp_login": "postmaster@speasy.app",
+    "type": "custom",
+    "receiving_dns_records": null,
+    "sending_dns_records": null,
+    "id": "679068eaa4d0b0bd27669f05",
+    "is_disabled": false,
+    "web_prefix": "email",
+    "web_scheme": "http",
+    "use_automatic_sender_security": false
+  },
+  {
+    "name": "sandbox1588502a99dd44cc9f2591d5615a5078.mailgun.org",
+    "require_tls": false,
+    "skip_verification": false,
+    "state": "active",
+    "wildcard": false,
+    "spam_action": "disabled",
+    "created_at": "2025-01-22T03:32:48.000Z",
+    "smtp_login": "postmaster@sandbox1588502a99dd44cc9f2591d5615a5078.mailgun.org",
+    "type": "sandbox",
+    "receiving_dns_records": null,
+    "sending_dns_records": null,
+    "id": "679066e072e1dbb3ba1b402f",
+    "is_disabled": false,
+    "web_prefix": "email",
+    "web_scheme": "http",
+    "use_automatic_sender_security": false
+  }
+]
+Found 2 domains in Mailgun account
+Domain found: {
+  "name": "speasy.app",
+  "require_tls": false,
+  "skip_verification": false,
+  "state": "active",
+  "wildcard": false,
+  "spam_action": "disabled",
+  "created_at": "2025-01-22T03:41:30.000Z",
+  "smtp_login": "postmaster@speasy.app",
+  "type": "custom",
+  "receiving_dns_records": null,
+  "sending_dns_records": null,
+  "id": "679068eaa4d0b0bd27669f05",
+  "is_disabled": false,
+  "web_prefix": "email",
+  "web_scheme": "http",
+  "use_automatic_sender_security": false
+}
+Checking DNS records...
+Error fetching DNS records: TypeError: mg.domains.getDomainRecords is not a function
+    at verifyDomainSetup (/home/runner/workspace/server/mailgun.ts:60:43)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+Setting up email routes...
+Fetching existing Mailgun routes...
+Routes response: [
+  {
+    "actions": [
+      "forward(\"undefined/api/email/incoming\")",
+      "stop()"
+    ],
+    "created_at": "Wed, 22 Jan 2025 07:04:31 GMT",
+    "description": "Forward all incoming emails to our API",
+    "expression": "match_recipient(\".*@speasy.app\")",
+    "id": "6790987fbb3cd97515658faa",
+    "priority": 0
+  }
+]
+Found 1 existing routes
+Existing Mailgun route found: {
+  "actions": [
+    "forward(\"undefined/api/email/incoming\")",
+    "stop()"
+  ],
+  "created_at": "Wed, 22 Jan 2025 07:04:31 GMT",
+  "description": "Forward all incoming emails to our API",
+  "expression": "match_recipient(\".*@speasy.app\")",
+  "id": "6790987fbb3cd97515658faa",
+  "priority": 0
+}
+Mailgun configuration completed successfully

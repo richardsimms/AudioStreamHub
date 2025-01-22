@@ -54,32 +54,6 @@ Please add this domain in your Mailgun dashboard:
     }
 
     console.log("Domain found:", JSON.stringify(domain, null, 2));
-    console.log("Checking DNS records...");
-
-    try {
-      const dnsRecords = await mg.domains.getDomainRecords(process.env.MAILGUN_DOMAIN!);
-      console.log("DNS Records:", JSON.stringify(dnsRecords, null, 2));
-
-      if (dnsRecords && dnsRecords.receiving_dns_records) {
-        const unverifiedRecords = dnsRecords.receiving_dns_records.filter(record => !record.valid);
-
-        if (unverifiedRecords.length > 0) {
-          console.error(`
-Domain found but has unverified DNS records. Please add these DNS records:
-${unverifiedRecords.map(record => `
-Type: ${record.record_type}
-Name: ${record.name}
-Value: ${record.value}
-`).join('\n')}
-          `);
-          return;
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching DNS records:", error);
-      // Continue with route setup even if we can't fetch DNS records
-    }
-
     console.log("Setting up email routes...");
     await setupEmailRoutes();
     console.log("Mailgun configuration completed successfully");
@@ -114,8 +88,8 @@ async function setupEmailRoutes() {
           "store()",
           "stop()"
         ],
-        description: "Forward incoming emails to API endpoint",
-        priority: 10
+        description: "Forward all incoming emails to our API",
+        priority: 0
       };
 
       console.log("Route configuration:", JSON.stringify(routeConfig, null, 2));
