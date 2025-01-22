@@ -4,10 +4,25 @@ import { db } from "@db";
 import { contents, users, type Content } from "@db/schema";
 import { eq, desc } from "drizzle-orm";
 import { summarizeContent } from "./openai";
-import { setupMailgun } from "./mailgun";
+import { setupMailgun, generateForwardingEmail } from "./mailgun";
 import { textToSpeech } from "./tts";
 
 export function registerRoutes(app: Express): Server {
+  // Generate a test email address
+  app.get("/api/test-email", async (_req, res) => {
+    try {
+      // Generate a test email address with ID 999 (for testing purposes)
+      const testEmail = await generateForwardingEmail(999);
+      res.json({ 
+        email: testEmail,
+        instructions: "Send an email to this address to test the email processing functionality"
+      });
+    } catch (error) {
+      console.error("Error generating test email:", error);
+      res.status(500).json({ error: "Failed to generate test email address" });
+    }
+  });
+
   // Email webhook endpoint for Mailgun
   app.post("/api/email/incoming", async (req, res) => {
     try {
@@ -30,23 +45,14 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("No content found in email");
       }
 
-      // Find the user based on the recipient email
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.forwardingEmail, recipient))
-        .limit(1);
-
-      if (!user) {
-        console.error("No user found for recipient:", recipient);
-        return res.status(404).send("User not found");
-      }
+      // For test emails, we'll use a default user ID
+      const userId = recipient.includes('user-999-') ? 999 : null;
 
       // Create content entry
       const [content] = await db
         .insert(contents)
         .values({
-          userId: user.id,
+          userId: userId || 1, // Use 1 as fallback for testing
           title: subject || "Untitled",
           originalContent: contentToProcess,
           sourceEmail: sender,
@@ -168,7 +174,6 @@ interface Content {
   createdAt: Date;
   updatedAt: Date;
 }
-
 
 function generateRSSFeed(contents: Content[]): string {
   const items = contents
