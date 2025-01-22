@@ -1,47 +1,64 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
-import { contents, playlists, playlistContents } from "@db/schema";
+import { contents, users, type Content } from "@db/schema";
+import { eq, desc } from "drizzle-orm";
 import { summarizeContent } from "./openai";
 import { setupMailgun } from "./mailgun";
 import { textToSpeech } from "./tts";
-import { eq } from "drizzle-orm";
 
 export function registerRoutes(app: Express): Server {
   // Email webhook endpoint for Mailgun
   app.post("/api/email/incoming", async (req, res) => {
     try {
+      console.log("Received email webhook:", req.body);
+
       // Extract email data from Mailgun webhook payload
       const {
-        sender: from,
+        sender,
+        recipient,
         subject,
-        "body-plain": body,
-        recipient: to,
+        "body-plain": bodyPlain,
         "stripped-text": strippedText,
       } = req.body;
 
-      // Use stripped text if available, otherwise fallback to body
-      const contentToProcess = strippedText || body;
+      // Use stripped text if available, otherwise fallback to plain body
+      const contentToProcess = strippedText || bodyPlain;
 
       if (!contentToProcess) {
         console.error("No content found in email");
         return res.status(400).send("No content found in email");
       }
 
+      // Find the user based on the recipient email
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.forwardingEmail, recipient))
+        .limit(1);
+
+      if (!user) {
+        console.error("No user found for recipient:", recipient);
+        return res.status(404).send("User not found");
+      }
+
       // Create content entry
-      const [content] = await db.insert(contents).values({
-        title: subject || "Untitled",
-        originalContent: contentToProcess,
-        sourceEmail: from,
-        isProcessed: false,
-      }).returning();
+      const [content] = await db
+        .insert(contents)
+        .values({
+          userId: user.id,
+          title: subject || "Untitled",
+          originalContent: contentToProcess,
+          sourceEmail: sender,
+          isProcessed: false,
+        })
+        .returning();
 
       // Process content asynchronously
       processContent(content.id).catch(error => {
         console.error("Error processing content:", error);
       });
 
-      // Respond to Mailgun webhook
       res.status(200).json({
         message: "Email received and queued for processing",
         contentId: content.id
@@ -55,10 +72,14 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Get all contents
+  // Get all contents for the current user
   app.get("/api/contents", async (req, res) => {
     try {
-      const allContents = await db.select().from(contents);
+      const allContents = await db
+        .select()
+        .from(contents)
+        .orderBy(desc(contents.createdAt));
+
       res.json(allContents);
     } catch (error) {
       console.error("Error fetching contents:", error);
@@ -69,52 +90,14 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Get all playlists
-  app.get("/api/playlists", async (req, res) => {
+  // RSS feed generation endpoint
+  app.get("/api/feed", async (req, res) => {
     try {
-      const allPlaylists = await db.select().from(playlists);
-      res.json(allPlaylists);
-    } catch (error) {
-      console.error("Error fetching playlists:", error);
-      res.status(500).json({
-        error: "Internal server error",
-        message: "Failed to fetch playlists"
-      });
-    }
-  });
-
-  // Get contents for a playlist
-  app.get("/api/playlists/:id/contents", async (req, res) => {
-    try {
-      const playlistId = parseInt(req.params.id);
-      const items = await db
-        .select({
-          content: contents,
-        })
-        .from(playlistContents)
-        .where(eq(playlistContents.playlistId, playlistId))
-        .innerJoin(contents, eq(playlistContents.contentId, contents.id))
-        .orderBy(playlistContents.order);
-
-      res.json(items.map(item => item.content));
-    } catch (error) {
-      console.error("Error fetching playlist contents:", error);
-      res.status(500).json({
-        error: "Internal server error",
-        message: "Failed to fetch playlist contents"
-      });
-    }
-  });
-
-  // RSS feed for a user's content
-  app.get("/api/feed/:userId", async (req, res) => {
-    try {
-      const userId = parseInt(req.params.userId);
       const userContents = await db
         .select()
         .from(contents)
-        .where(eq(contents.userId, userId))
-        .orderBy(contents.createdAt);
+        .orderBy(desc(contents.createdAt))
+        .limit(50);
 
       const feed = generateRSSFeed(userContents);
       res.type("application/xml").send(feed);
@@ -128,7 +111,6 @@ export function registerRoutes(app: Express): Server {
   });
 
   const httpServer = createServer(app);
-
   setupMailgun();
   return httpServer;
 }
@@ -175,14 +157,27 @@ async function processContent(contentId: number) {
   }
 }
 
-function generateRSSFeed(contents: any[]): string {
+interface Content {
+  id: number;
+  userId: number;
+  title: string;
+  originalContent: string;
+  summary?: string;
+  audioUrl?: string;
+  isProcessed: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+
+function generateRSSFeed(contents: Content[]): string {
   const items = contents
     .map(
       (content) => `
       <item>
         <title>${content.title}</title>
         <description>${content.summary ? JSON.stringify(content.summary) : ''}</description>
-        <enclosure url="${content.audioUrl}" type="audio/mpeg" length="0"/>
+        ${content.audioUrl ? `<enclosure url="${content.audioUrl}" type="audio/mpeg" length="0"/>` : ''}
         <pubDate>${new Date(content.createdAt).toUTCString()}</pubDate>
         <guid isPermaLink="false">${content.id}</guid>
       </item>
@@ -194,7 +189,7 @@ function generateRSSFeed(contents: any[]): string {
     <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
       <channel>
         <title>Your Audio Content</title>
-        <link>${process.env.APP_URL || 'http://localhost:5000'}</link>
+        <link>${process.env.PUBLIC_WEBHOOK_URL}</link>
         <description>Your personalized audio content feed</description>
         <language>en-us</language>
         ${items}

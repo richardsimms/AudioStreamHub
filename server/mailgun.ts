@@ -102,12 +102,29 @@ async function setupEmailRoutes() {
       }
     }
 
+    // Check if we have a public webhook URL
+    if (!process.env.PUBLIC_WEBHOOK_URL) {
+      console.error(`
+Error: PUBLIC_WEBHOOK_URL environment variable is not set.
+Mailgun requires a publicly accessible webhook URL to forward emails.
+
+For development, you can use a service like ngrok to expose your local server:
+1. Install ngrok: npm install -g ngrok
+2. Run: ngrok http 5000
+3. Copy the HTTPS URL and set it as PUBLIC_WEBHOOK_URL environment variable
+4. Restart the application
+
+For production, set PUBLIC_WEBHOOK_URL to your actual domain.
+`);
+      return;
+    }
+
     console.log("Creating new route for email forwarding...");
-    const appUrl = process.env.APP_URL || 'http://localhost:5000';
+    const webhookUrl = `${process.env.PUBLIC_WEBHOOK_URL}/api/email/incoming`;
     const routeConfig = {
       expression: `match_recipient(".*@${process.env.MAILGUN_DOMAIN}")`,
       action: [
-        `forward("${appUrl}/api/email/incoming")`,
+        `forward("${webhookUrl}")`,
         "store()",
         "stop()"
       ],
@@ -124,6 +141,14 @@ async function setupEmailRoutes() {
     if (error instanceof Error) {
       console.error("Error details:", error.message);
       console.error("Error stack:", error.stack);
+    }
+
+    if ((error as any)?.details?.includes('must be publicly accessible')) {
+      console.error(`
+Error: Webhook URL must be publicly accessible.
+Please make sure your PUBLIC_WEBHOOK_URL environment variable points to a publicly accessible URL.
+Local development URLs (localhost) will not work with Mailgun webhooks.
+`);
     }
   }
 }
