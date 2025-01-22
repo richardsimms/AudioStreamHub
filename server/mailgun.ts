@@ -30,15 +30,18 @@ async function verifyDomainSetup() {
   try {
     console.log("Fetching Mailgun domains...");
     const domains = await mg.domains.list();
+    console.log("Domains response:", JSON.stringify(domains, null, 2));
 
-    if (!domains || !domains.items) {
-      console.error("Error: Unable to fetch domains from Mailgun. Response:", domains);
+    if (!domains) {
+      console.error("Error: No domains response from Mailgun");
       return;
     }
 
-    console.log(`Found ${domains.items.length} domains in Mailgun account`);
+    // Handle domains being directly in the response
+    const domainsList = Array.isArray(domains) ? domains : domains.items || [];
+    console.log(`Found ${domainsList.length} domains in Mailgun account`);
 
-    const domain = domains.items.find(d => d.name === process.env.MAILGUN_DOMAIN);
+    const domain = domainsList.find(d => d.name === process.env.MAILGUN_DOMAIN);
 
     if (!domain) {
       console.error(`Domain ${process.env.MAILGUN_DOMAIN} not found in Mailgun account.
@@ -50,39 +53,34 @@ Please add this domain in your Mailgun dashboard:
       return;
     }
 
-    console.log("Domain found, checking DNS records...");
+    console.log("Domain found:", JSON.stringify(domain, null, 2));
+    console.log("Checking DNS records...");
 
-    // Check DNS records verification status
-    const dnsRecords = await mg.domains.getDomainRecords(process.env.MAILGUN_DOMAIN!);
-    console.log("DNS Records:", JSON.stringify(dnsRecords, null, 2));
+    try {
+      const dnsRecords = await mg.domains.getDomainRecords(process.env.MAILGUN_DOMAIN!);
+      console.log("DNS Records:", JSON.stringify(dnsRecords, null, 2));
 
-    const unverifiedRecords = dnsRecords.receiving_dns_records.filter(record => !record.valid) || [];
+      if (dnsRecords && dnsRecords.receiving_dns_records) {
+        const unverifiedRecords = dnsRecords.receiving_dns_records.filter(record => !record.valid);
 
-    if (unverifiedRecords.length > 0) {
-      console.error(`
+        if (unverifiedRecords.length > 0) {
+          console.error(`
 Domain found but has unverified DNS records. Please add these DNS records:
 ${unverifiedRecords.map(record => `
 Type: ${record.record_type}
 Name: ${record.name}
 Value: ${record.value}
 `).join('\n')}
-      `);
-      return;
+          `);
+          return;
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching DNS records:", error);
+      // Continue with route setup even if we can't fetch DNS records
     }
 
-    if (!domain.isVerified) {
-      console.error(`Domain ${process.env.MAILGUN_DOMAIN} exists but is not verified.
-Please verify your domain in the Mailgun dashboard:
-1. Go to Sending → Domains
-2. Click on your domain
-3. Check the "Domain Verification & DNS" section
-4. Add any missing DNS records`);
-      return;
-    }
-
-    console.log("Domain is verified, setting up email routes...");
-
-    // Then set up the routes if domain is verified
+    console.log("Setting up email routes...");
     await setupEmailRoutes();
     console.log("Mailgun configuration completed successfully");
   } catch (error) {
@@ -98,15 +96,12 @@ async function setupEmailRoutes() {
   try {
     console.log("Fetching existing Mailgun routes...");
     const routes = await mg.routes.list();
+    console.log("Routes response:", JSON.stringify(routes, null, 2));
 
-    if (!routes || !routes.items) {
-      console.error("Error: Unable to fetch routes from Mailgun. Response:", routes);
-      return;
-    }
+    const routesList = Array.isArray(routes) ? routes : routes.items || [];
+    console.log(`Found ${routesList.length} existing routes`);
 
-    console.log(`Found ${routes.items.length} existing routes`);
-
-    const existingRoute = routes.items.find(route => 
+    const existingRoute = routesList.find(route => 
       route.expression.includes(process.env.MAILGUN_DOMAIN!)
     );
 
