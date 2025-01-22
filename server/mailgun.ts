@@ -57,7 +57,7 @@ Please add this domain in your Mailgun dashboard:
     console.log("Checking DNS records...");
 
     try {
-      const dnsResponse = await mg.domains.getDomainCredentials(process.env.MAILGUN_DOMAIN);
+      const dnsResponse = await mg.domains.getDNS(process.env.MAILGUN_DOMAIN!);
       console.log("DNS Records:", JSON.stringify(dnsResponse, null, 2));
 
       console.error(`
@@ -67,8 +67,8 @@ Please add these DNS records for your domain:
    - Value: v=spf1 include:mailgun.org ~all
 
 2. DKIM Record (TXT):
-   - Name: ${dnsResponse.sending_dns_records?.find(r => r.record_type === 'TXT' && r.name.startsWith('k1._domainkey'))?.name || 'k1._domainkey'}
-   - Value: ${dnsResponse.sending_dns_records?.find(r => r.record_type === 'TXT' && r.name.startsWith('k1._domainkey'))?.value || 'Check Mailgun dashboard for value'}
+   - Name: k1._domainkey.${process.env.MAILGUN_DOMAIN}
+   - Value: Check Mailgun dashboard for value
 
 3. MX Records:
    - Name: @
