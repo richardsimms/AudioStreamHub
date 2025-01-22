@@ -54,6 +54,35 @@ Please add this domain in your Mailgun dashboard:
     }
 
     console.log("Domain found:", JSON.stringify(domain, null, 2));
+    console.log("Checking DNS records...");
+
+    try {
+      const dnsResponse = await mg.domains.getDomainCredentials(process.env.MAILGUN_DOMAIN);
+      console.log("DNS Records:", JSON.stringify(dnsResponse, null, 2));
+
+      console.error(`
+Please add these DNS records for your domain:
+1. SPF Record (TXT):
+   - Name: @
+   - Value: v=spf1 include:mailgun.org ~all
+
+2. DKIM Record (TXT):
+   - Name: ${dnsResponse.sending_dns_records?.find(r => r.record_type === 'TXT' && r.name.startsWith('k1._domainkey'))?.name || 'k1._domainkey'}
+   - Value: ${dnsResponse.sending_dns_records?.find(r => r.record_type === 'TXT' && r.name.startsWith('k1._domainkey'))?.value || 'Check Mailgun dashboard for value'}
+
+3. MX Records:
+   - Name: @
+   - Value: mxa.mailgun.org (Priority 10)
+   - Value: mxb.mailgun.org (Priority 10)
+      `);
+
+      return;
+    } catch (error) {
+      console.error("Error fetching DNS records:", error);
+      console.error("Please check your Mailgun dashboard for the required DNS records");
+      return;
+    }
+
     console.log("Setting up email routes...");
     await setupEmailRoutes();
     console.log("Mailgun configuration completed successfully");
