@@ -77,6 +77,10 @@ async function setupEmailRoutes() {
 
     // Validate and format webhook URL
     let webhookUrl = process.env.PUBLIC_WEBHOOK_URL;
+    // Ensure URL has https:// protocol
+    if (!webhookUrl.startsWith('https://')) {
+      webhookUrl = `https://${webhookUrl}`;
+    }
     // Remove trailing slash if present
     webhookUrl = webhookUrl.replace(/\/$/, '');
     // Append the email endpoint path
