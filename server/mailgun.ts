@@ -58,6 +58,10 @@ async function verifyDomainSetup() {
 
 async function setupEmailRoutes() {
   try {
+    if (!process.env.PUBLIC_WEBHOOK_URL) {
+      throw new Error("PUBLIC_WEBHOOK_URL environment variable is not set");
+    }
+
     console.log("Fetching existing Mailgun routes...");
     const routes = await mg.routes.list();
     console.log("Routes response:", JSON.stringify(routes, null, 2));
@@ -71,9 +75,9 @@ async function setupEmailRoutes() {
       await mg.routes.destroy(route.id);
     }
 
-    // Use the webhook ID provided by Mailgun
-    const webhookId = "16969a7cf881ec4e76c8b56a7d5c5ce4";
-    const emailEndpoint = `${webhookId}/api/email/incoming`;
+    // Use the publicly accessible Replit URL
+    const webhookUrl = "https://7618ae55-dcd1-4178-8a15-04009091ee27-00-q5sdxm13xgps.riker.replit.dev";
+    const emailEndpoint = `${webhookUrl}/api/email/incoming`;
 
     console.log("Configuring route with webhook URL:", emailEndpoint);
 
