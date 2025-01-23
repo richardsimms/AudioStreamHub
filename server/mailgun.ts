@@ -88,10 +88,8 @@ async function setupEmailRoutes() {
       await mg.routes.destroy(route.id);
     }
 
-    const webhookUrl = process.env.REPL_SLUG ? 
-      `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co` :
-      "https://speasy.app";
-
+    // Use the full Replit URL from the request
+    const webhookUrl = "https://7618ae55-dcd1-4178-8a15-04009091ee27-00-q5sdxm13xgps.riker.replit.dev";
     const emailEndpoint = `${webhookUrl}/api/email/incoming`;
     console.log("Configuring route with webhook URL:", emailEndpoint);
 

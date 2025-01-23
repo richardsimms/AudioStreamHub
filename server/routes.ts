@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
-import { contents } from "@db/schema";
+import { contents, users } from "@db/schema";
 import { eq, desc } from "drizzle-orm";
 import { summarizeContent } from "./openai";
 import { setupMailgun, generateForwardingEmail } from "./mailgun";
@@ -37,6 +37,7 @@ export function registerRoutes(app: Express): Server {
       // Extract email data from Mailgun webhook payload
       const {
         sender,
+        from,
         recipient,
         subject,
         "body-plain": bodyPlain,
@@ -47,21 +48,35 @@ export function registerRoutes(app: Express): Server {
       const contentToProcess = strippedText || bodyPlain;
 
       if (!contentToProcess) {
-        console.error("No content found in email");
         return res.status(400).json({ error: "No content found in email" });
       }
 
-      // For test emails, we'll use a default user ID
-      const userId = 999; // Using test user ID
+      // Use the sender's email or 'from' field to find the corresponding user
+      const senderEmail = sender || from;
+      if (!senderEmail) {
+        return res.status(400).json({ error: "No sender email found" });
+      }
+
+      // For test purposes, use test user (ID: 999)
+      // In production, you would look up the user based on the sender's email
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, 999))
+        .limit(1);
+
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
 
       // Create content entry
       const [content] = await db
         .insert(contents)
         .values({
-          userId,
+          userId: user.id,
           title: subject || "Untitled",
           originalContent: contentToProcess,
-          sourceEmail: sender,
+          sourceEmail: senderEmail,
           isProcessed: false,
         })
         .returning();
