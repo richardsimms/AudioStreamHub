@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
-import { contents, type Content } from "@db/schema";
+import { contents } from "@db/schema";
 import { eq, desc } from "drizzle-orm";
 import { summarizeContent } from "./openai";
 import { setupMailgun, generateForwardingEmail } from "./mailgun";
@@ -23,11 +23,16 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Email webhook endpoint for Mailgun
-  app.post("/api/email/incoming", async (req, res) => {
+  // Email webhook endpoint for Mailgun - handle both GET and POST
+  app.all("/api/email/incoming", async (req, res) => {
     try {
       console.log("Received webhook request headers:", req.headers);
       console.log("Received webhook request body:", JSON.stringify(req.body, null, 2));
+
+      // For GET requests, return a success message (useful for webhook verification)
+      if (req.method === 'GET') {
+        return res.status(200).json({ status: 'ok', message: 'Email webhook endpoint is active' });
+      }
 
       // Extract email data from Mailgun webhook payload
       const {
