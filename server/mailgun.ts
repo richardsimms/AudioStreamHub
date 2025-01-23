@@ -75,12 +75,8 @@ async function setupEmailRoutes() {
       await mg.routes.destroy(route.id);
     }
 
-    // Ensure webhook URL is properly formatted with HTTPS
-    let webhookUrl = process.env.PUBLIC_WEBHOOK_URL;
-    if (!webhookUrl.startsWith('https://')) {
-      webhookUrl = `https://${webhookUrl}`;
-    }
-    webhookUrl = webhookUrl.replace(/\/$/, ''); // Remove trailing slash if present
+    // Use the publicly accessible Replit URL
+    const webhookUrl = "https://7618ae55-dcd1-4178-8a15-04009091ee27-00-q5sdxm13xgps.riker.replit.dev";
     const emailEndpoint = `${webhookUrl}/api/email/incoming`;
 
     console.log("Configuring route with webhook URL:", emailEndpoint);
