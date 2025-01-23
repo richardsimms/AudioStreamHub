@@ -75,35 +75,42 @@ async function setupEmailRoutes() {
       await mg.routes.destroy(route.id);
     }
 
-    // Validate and format webhook URL
-    const webhookUrl = process.env.PUBLIC_WEBHOOK_URL;
-    console.log("Using webhook URL:", webhookUrl);
+    // Ensure webhook URL is properly formatted with HTTPS
+    let webhookUrl = process.env.PUBLIC_WEBHOOK_URL;
+    if (!webhookUrl.startsWith('https://')) {
+      webhookUrl = `https://${webhookUrl}`;
+    }
+    webhookUrl = webhookUrl.replace(/\/$/, ''); // Remove trailing slash if present
+    const emailEndpoint = `${webhookUrl}/api/email/incoming`;
+
+    console.log("Configuring route with webhook URL:", emailEndpoint);
 
     // Create route configuration
-    console.log("Creating new route for email forwarding...");
     const routeConfig = {
       expression: `match_recipient(".*@${process.env.MAILGUN_DOMAIN}")`,
       action: [
-        `forward("${webhookUrl}/api/email/incoming")`,
-        "store()",
-        "stop()"
+        `forward("${emailEndpoint}")`,
+        'store()',
+        'stop()'
       ],
       description: "Forward all incoming emails to our API",
       priority: 0
     };
 
-    console.log("Route configuration:", JSON.stringify(routeConfig, null, 2));
+    console.log("Creating new route with configuration:", JSON.stringify(routeConfig, null, 2));
+
     try {
       const newRoute = await mg.routes.create(routeConfig);
-      console.log("Successfully created new route:", JSON.stringify(newRoute, null, 2));
+      console.log("Successfully created route:", JSON.stringify(newRoute, null, 2));
     } catch (routeError) {
-      console.error("Failed to create route:", routeError);
-      // Attempt to create route with simplified configuration
+      console.error("Failed to create route with full configuration:", routeError);
+
+      // Try creating route without store() and stop() actions
       const retryConfig = {
         ...routeConfig,
-        action: [`forward("${webhookUrl}/api/email/incoming")`]
+        action: [`forward("${emailEndpoint}")`]
       };
-      console.log("Retrying with simplified route configuration:", JSON.stringify(retryConfig, null, 2));
+      console.log("Retrying with simplified configuration:", JSON.stringify(retryConfig, null, 2));
       const newRoute = await mg.routes.create(retryConfig);
       console.log("Successfully created simplified route:", JSON.stringify(newRoute, null, 2));
     }
