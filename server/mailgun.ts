@@ -43,13 +43,38 @@ async function verifyDomainSetup() {
     console.log("Using custom domain:", customDomain.name);
     process.env.MAILGUN_DOMAIN = customDomain.name;
 
-    // Get DNS records for verification
+    // Get DNS records for verification and wait for verification
     const domainInfo = await mg.domains.get(customDomain.name);
-    console.log("Domain DNS records:", JSON.stringify(domainInfo.receiving_dns_records, null, 2));
+    console.log("Domain Info:", JSON.stringify(domainInfo, null, 2));
 
-    console.log("Setting up email routes...");
-    await setupEmailRoutes();
-    console.log("Mailgun configuration completed successfully");
+    if (!domainInfo.receiving_dns_records) {
+      console.error("No receiving DNS records found. Domain might not be properly configured.");
+      return;
+    }
+
+    // Log all required DNS records
+    console.log("Required DNS Records for receiving emails:");
+    domainInfo.receiving_dns_records.forEach((record: any) => {
+      console.log(`${record.record_type} record:`, {
+        name: record.name || customDomain.name,
+        value: record.value,
+        priority: record.priority,
+        valid: record.valid
+      });
+    });
+
+    // Verify domain status
+    if (domainInfo.state !== 'active' || !domainInfo.is_ready_to_receive) {
+      console.error("Domain is not ready to receive emails. Please verify DNS records are properly configured.");
+      return;
+    }
+
+    // Only proceed with route setup if domain is properly configured
+    if (domainInfo.state === 'active' && domainInfo.is_ready_to_receive) {
+      console.log("Setting up email routes...");
+      await setupEmailRoutes();
+      console.log("Mailgun configuration completed successfully");
+    }
   } catch (error) {
     console.error("Error verifying Mailgun setup:", error);
     throw error;
@@ -75,15 +100,18 @@ async function setupEmailRoutes() {
       await mg.routes.destroy(route.id);
     }
 
-    // Use the publicly accessible Replit URL
-    const webhookUrl = "https://7618ae55-dcd1-4178-8a15-04009091ee27-00-q5sdxm13xgps.riker.replit.dev";
+    // Use the Replit-provided URL
+    const webhookUrl = process.env.REPL_SLUG ? 
+      `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co` :
+      "https://speasy.app";
+
     const emailEndpoint = `${webhookUrl}/api/email/incoming`;
 
     console.log("Configuring route with webhook URL:", emailEndpoint);
 
-    // Create route configuration
+    // Create route configuration with catch-all expression
     const routeConfig = {
-      expression: `match_recipient(".*@${process.env.MAILGUN_DOMAIN}")`,
+      expression: 'catch_all()',
       action: [
         `forward("${emailEndpoint}")`,
         'store()',
@@ -95,21 +123,8 @@ async function setupEmailRoutes() {
 
     console.log("Creating new route with configuration:", JSON.stringify(routeConfig, null, 2));
 
-    try {
-      const newRoute = await mg.routes.create(routeConfig);
-      console.log("Successfully created route:", JSON.stringify(newRoute, null, 2));
-    } catch (routeError) {
-      console.error("Failed to create route with full configuration:", routeError);
-
-      // Try creating route without store() and stop() actions
-      const retryConfig = {
-        ...routeConfig,
-        action: [`forward("${emailEndpoint}")`]
-      };
-      console.log("Retrying with simplified configuration:", JSON.stringify(retryConfig, null, 2));
-      const newRoute = await mg.routes.create(retryConfig);
-      console.log("Successfully created simplified route:", JSON.stringify(newRoute, null, 2));
-    }
+    const newRoute = await mg.routes.create(routeConfig);
+    console.log("Successfully created route:", JSON.stringify(newRoute, null, 2));
 
   } catch (error) {
     console.error("Error managing Mailgun routes:", error);
