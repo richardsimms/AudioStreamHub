@@ -76,22 +76,15 @@ async function setupEmailRoutes() {
     }
 
     // Validate and format webhook URL
-    let webhookUrl = process.env.PUBLIC_WEBHOOK_URL;
-    // Ensure URL has https:// protocol
-    if (!webhookUrl.startsWith('https://')) {
-      webhookUrl = `https://${webhookUrl}`;
-    }
-    // Remove trailing slash if present
-    webhookUrl = webhookUrl.replace(/\/$/, '');
-    // Append the email endpoint path
-    webhookUrl = `${webhookUrl}/api/email/incoming`;
+    const webhookUrl = process.env.PUBLIC_WEBHOOK_URL;
     console.log("Using webhook URL:", webhookUrl);
 
+    // Create route configuration
     console.log("Creating new route for email forwarding...");
     const routeConfig = {
       expression: `match_recipient(".*@${process.env.MAILGUN_DOMAIN}")`,
       action: [
-        `forward("${webhookUrl}")`,
+        `forward("${webhookUrl}/api/email/incoming")`,
         "store()",
         "stop()"
       ],
@@ -108,7 +101,7 @@ async function setupEmailRoutes() {
       // Attempt to create route with simplified configuration
       const retryConfig = {
         ...routeConfig,
-        action: [`forward("${webhookUrl}")`]
+        action: [`forward("${webhookUrl}/api/email/incoming")`]
       };
       console.log("Retrying with simplified route configuration:", JSON.stringify(retryConfig, null, 2));
       const newRoute = await mg.routes.create(retryConfig);
