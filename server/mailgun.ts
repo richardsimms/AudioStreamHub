@@ -43,37 +43,29 @@ async function verifyDomainSetup() {
     console.log("Using custom domain:", customDomain.name);
     process.env.MAILGUN_DOMAIN = customDomain.name;
 
-    // Get DNS records for verification and wait for verification
+    // Get domain info and verify receiving records
     const domainInfo = await mg.domains.get(customDomain.name);
     console.log("Domain Info:", JSON.stringify(domainInfo, null, 2));
 
-    if (!domainInfo.receiving_dns_records) {
-      console.error("No receiving DNS records found. Domain might not be properly configured.");
-      return;
+    // Wait for domain to be ready (retry a few times)
+    let retries = 3;
+    while (retries > 0) {
+      if (domainInfo.state === 'active' && domainInfo.receiving_dns_records?.every((record: any) => record.valid === 'valid')) {
+        console.log("Domain is properly configured and ready to receive emails");
+        break;
+      }
+      console.log(`Domain not ready yet. Retrying... (${retries} attempts left)`);
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      retries--;
     }
 
-    // Log all required DNS records
-    console.log("Required DNS Records for receiving emails:");
-    domainInfo.receiving_dns_records.forEach((record: any) => {
-      console.log(`${record.record_type} record:`, {
-        name: record.name || customDomain.name,
-        value: record.value,
-        priority: record.priority,
-        valid: record.valid
-      });
-    });
-
-    // Verify domain status
-    if (domainInfo.state !== 'active' || !domainInfo.is_ready_to_receive) {
-      console.error("Domain is not ready to receive emails. Please verify DNS records are properly configured.");
-      return;
-    }
-
-    // Only proceed with route setup if domain is properly configured
-    if (domainInfo.state === 'active' && domainInfo.is_ready_to_receive) {
+    // Set up routes only if domain is properly configured
+    if (domainInfo.state === 'active') {
       console.log("Setting up email routes...");
       await setupEmailRoutes();
       console.log("Mailgun configuration completed successfully");
+    } else {
+      console.error("Domain setup incomplete. Please verify DNS records.");
     }
   } catch (error) {
     console.error("Error verifying Mailgun setup:", error);
@@ -83,10 +75,6 @@ async function verifyDomainSetup() {
 
 async function setupEmailRoutes() {
   try {
-    if (!process.env.PUBLIC_WEBHOOK_URL) {
-      throw new Error("PUBLIC_WEBHOOK_URL environment variable is not set");
-    }
-
     console.log("Fetching existing Mailgun routes...");
     const routes = await mg.routes.list();
     console.log("Routes response:", JSON.stringify(routes, null, 2));
@@ -100,44 +88,36 @@ async function setupEmailRoutes() {
       await mg.routes.destroy(route.id);
     }
 
-    // Use the Replit-provided URL
     const webhookUrl = process.env.REPL_SLUG ? 
       `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co` :
       "https://speasy.app";
 
     const emailEndpoint = `${webhookUrl}/api/email/incoming`;
-
     console.log("Configuring route with webhook URL:", emailEndpoint);
 
-    // Create route configuration with catch-all expression
+    // Create route configuration with domain-specific expression
     const routeConfig = {
-      expression: 'catch_all()',
+      expression: `match_recipient(".*@${process.env.MAILGUN_DOMAIN}")`,
       action: [
         `forward("${emailEndpoint}")`,
         'store()',
         'stop()'
       ],
-      description: "Forward all incoming emails to our API",
+      description: "Forward incoming emails to our API",
       priority: 0
     };
 
     console.log("Creating new route with configuration:", JSON.stringify(routeConfig, null, 2));
-
     const newRoute = await mg.routes.create(routeConfig);
     console.log("Successfully created route:", JSON.stringify(newRoute, null, 2));
 
   } catch (error) {
     console.error("Error managing Mailgun routes:", error);
-    if (error instanceof Error) {
-      console.error("Error details:", error.message);
-      console.error("Error stack:", error.stack);
-    }
     throw error;
   }
 }
 
 export async function generateForwardingEmail(_userId: number): Promise<string> {
-  // Generate a random string for unique email addresses
   const randomString = Math.random().toString(36).substring(2, 15);
   const email = `${randomString}@${process.env.MAILGUN_DOMAIN}`;
   console.log(`Generated forwarding email: ${email}`);
