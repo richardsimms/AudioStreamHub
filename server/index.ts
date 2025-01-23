@@ -13,7 +13,19 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Parse multipart/form-data (for Mailgun webhooks)
-app.use(upload.none());
+app.use((req, res, next) => {
+  if (req.path === '/api/email/incoming') {
+    // Use raw-body for Mailgun webhooks
+    upload.fields([
+      { name: 'from' },
+      { name: 'subject' },
+      { name: 'body-plain' },
+      { name: 'recipient' }
+    ])(req, res, next);
+  } else {
+    upload.none()(req, res, next);
+  }
+});
 
 app.use((req, res, next) => {
   const start = Date.now();
