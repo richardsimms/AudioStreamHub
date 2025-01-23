@@ -1,8 +1,5 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import multer from "multer";
-
-const upload = multer({ storage: multer.memoryStorage() });
 import { db } from "@db";
 import { contents, users } from "@db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -27,19 +24,10 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Email webhook endpoint for Mailgun - handle both GET and POST
-  app.all("/api/email/incoming", upload.fields([
-    { name: 'from' },
-    { name: 'recipient' },
-    { name: 'subject' },
-    { name: 'body-plain' },
-    { name: 'stripped-text' },
-    { name: 'timestamp' },
-    { name: 'signature' }
-  ]), async (req, res) => {
+  app.all("/api/email/incoming", async (req, res) => {
     try {
       console.log("Received webhook request headers:", req.headers);
-      console.log("Received webhook request body:", req.body);
-      console.log("Received webhook request files:", req.files);
+      console.log("Received webhook request body:", JSON.stringify(req.body, null, 2));
 
       // For GET requests, return a success message (useful for webhook verification)
       if (req.method === 'GET') {
