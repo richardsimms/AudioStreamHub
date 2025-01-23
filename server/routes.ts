@@ -26,7 +26,8 @@ export function registerRoutes(app: Express): Server {
   // Email webhook endpoint for Mailgun
   app.post("/api/email/incoming", async (req, res) => {
     try {
-      console.log("Received email webhook:", JSON.stringify(req.body, null, 2));
+      console.log("Received webhook request headers:", req.headers);
+      console.log("Received webhook request body:", JSON.stringify(req.body, null, 2));
 
       // Extract email data from Mailgun webhook payload
       const {
@@ -42,7 +43,7 @@ export function registerRoutes(app: Express): Server {
 
       if (!contentToProcess) {
         console.error("No content found in email");
-        return res.status(400).send("No content found in email");
+        return res.status(400).json({ error: "No content found in email" });
       }
 
       // For test emails, we'll use a default user ID
@@ -70,7 +71,7 @@ export function registerRoutes(app: Express): Server {
         contentId: content.id
       });
     } catch (error) {
-      console.error("Error processing email:", error);
+      console.error("Error processing email webhook:", error);
       res.status(500).json({
         error: "Internal server error",
         message: "Failed to process incoming email"
