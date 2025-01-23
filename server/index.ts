@@ -4,7 +4,13 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
-const upload = multer();
+
+// Configure multer to accept any field
+const upload = multer({ 
+  limits: {
+    fieldSize: 10 * 1024 * 1024 // 10MB limit for fields
+  }
+});
 
 // Parse JSON payloads
 app.use(express.json());
@@ -13,7 +19,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Parse multipart/form-data (for Mailgun webhooks)
-app.use(upload.none());
+app.use(upload.any()); // Accept any fields from Mailgun
 
 app.use((req, res, next) => {
   const start = Date.now();

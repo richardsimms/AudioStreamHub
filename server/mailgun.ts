@@ -47,25 +47,42 @@ async function verifyDomainSetup() {
     const domainInfo = await mg.domains.get(customDomain.name);
     console.log("Domain Info:", JSON.stringify(domainInfo, null, 2));
 
-    // Wait for domain to be ready (retry a few times)
-    let retries = 3;
-    while (retries > 0) {
-      if (domainInfo.state === 'active' && domainInfo.receiving_dns_records?.every((record: any) => record.valid === 'valid')) {
-        console.log("Domain is properly configured and ready to receive emails");
-        break;
-      }
-      console.log(`Domain not ready yet. Retrying... (${retries} attempts left)`);
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      retries--;
+    // Verify the MX records specifically for receiving emails
+    const receivingRecords = domainInfo.receiving_dns_records || [];
+    const mxRecords = receivingRecords.filter((r: any) => r.record_type === 'MX');
+
+    if (!mxRecords.length) {
+      console.error("No MX records found. Email receiving will not work.");
+      return;
     }
 
-    // Set up routes only if domain is properly configured
-    if (domainInfo.state === 'active') {
+    // Verify all MX records are valid
+    const invalidMxRecords = mxRecords.filter((r: any) => r.valid !== 'valid');
+    if (invalidMxRecords.length > 0) {
+      console.error("Invalid MX records found:", invalidMxRecords);
+      return;
+    }
+
+    // Check all required DNS records
+    const receivingValid = receivingRecords.every((record: any) => record.valid === 'valid');
+    const sendingRecords = domainInfo.sending_dns_records || [];
+    const sendingValid = sendingRecords.every((record: any) => record.valid === 'valid');
+
+    if (domainInfo.state === 'active' && receivingValid && sendingValid) {
+      console.log("Domain is properly configured for receiving and sending emails");
+
+      // Set up routes only if domain is properly configured
       console.log("Setting up email routes...");
       await setupEmailRoutes();
       console.log("Mailgun configuration completed successfully");
     } else {
-      console.error("Domain setup incomplete. Please verify DNS records.");
+      console.error("Domain setup incomplete. DNS records status:", {
+        state: domainInfo.state,
+        receivingValid,
+        sendingValid,
+        invalidReceiving: receivingRecords.filter((r: any) => r.valid !== 'valid'),
+        invalidSending: sendingRecords.filter((r: any) => r.valid !== 'valid')
+      });
     }
   } catch (error) {
     console.error("Error verifying Mailgun setup:", error);
@@ -93,16 +110,16 @@ async function setupEmailRoutes() {
     const emailEndpoint = `${webhookUrl}/api/email/incoming`;
     console.log("Configuring route with webhook URL:", emailEndpoint);
 
-    // Create route configuration with domain-specific expression
+    // Create route configuration with proper order of actions
     const routeConfig = {
       expression: `match_recipient(".*@${process.env.MAILGUN_DOMAIN}")`,
       action: [
-        `forward("${emailEndpoint}")`,
-        'store()',
-        'stop()'
+        'store()',  // Store the message first
+        `forward("${emailEndpoint}")`,  // Then forward to our webhook
+        'stop()'    // Stop processing after forwarding
       ],
       description: "Forward incoming emails to our API",
-      priority: 0
+      priority: 0   // Highest priority
     };
 
     console.log("Creating new route with configuration:", JSON.stringify(routeConfig, null, 2));
@@ -116,6 +133,9 @@ async function setupEmailRoutes() {
 }
 
 export async function generateForwardingEmail(_userId: number): Promise<string> {
+  if (!process.env.MAILGUN_DOMAIN) {
+    throw new Error("Mailgun domain not configured");
+  }
   const randomString = Math.random().toString(36).substring(2, 15);
   const email = `${randomString}@${process.env.MAILGUN_DOMAIN}`;
   console.log(`Generated forwarding email: ${email}`);

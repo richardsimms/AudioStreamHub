@@ -26,8 +26,11 @@ export function registerRoutes(app: Express): Server {
   // Email webhook endpoint for Mailgun - handle both GET and POST
   app.all("/api/email/incoming", async (req, res) => {
     try {
+      // Enhanced logging for debugging Mailgun webhook
+      console.log("Received webhook request method:", req.method);
       console.log("Received webhook request headers:", req.headers);
       console.log("Received webhook request body:", JSON.stringify(req.body, null, 2));
+      console.log("Received webhook request files:", req.files);
 
       // For GET requests, return a success message (useful for webhook verification)
       if (req.method === 'GET') {
@@ -40,9 +43,23 @@ export function registerRoutes(app: Express): Server {
         from,
         recipient,
         subject,
-        "body-plain": bodyPlain,
-        "stripped-text": strippedText,
+        'body-plain': bodyPlain,
+        'stripped-text': strippedText,
+        'message-headers': messageHeaders,
+        timestamp,
+        token,
+        signature
       } = req.body;
+
+      console.log("Processed webhook data:", {
+        sender,
+        from,
+        recipient,
+        subject,
+        bodyPlain,
+        strippedText,
+        timestamp
+      });
 
       // Use stripped text if available, otherwise fallback to plain body
       const contentToProcess = strippedText || bodyPlain;
