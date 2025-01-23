@@ -1,0 +1,110 @@
+You're correct that Mailgun's webhook sends data in a format that differs from your `curl` test, causing the "Unexpected field" error. Mailgun sends email data as `multipart/form-data`, and the payload includes specific fields that might not match the fields expected by your current webhook handler.
+
+Here’s how to fix it:
+
+---
+
+### Updated Webhook Handler
+
+To handle Mailgun's webhook data properly, use the `multer` middleware in Express to parse `multipart/form-data`. Update your handler as follows:
+
+```typescript
+import express from "express";
+import multer from "multer";
+
+const upload = multer();
+
+const app = express();
+
+app.post('/api/email/incoming', upload.any(), async (req, res) => {
+    try {
+        // Log incoming request for debugging
+        console.log('Received headers:', req.headers);
+        console.log('Received body:', req.body);
+
+        // Extract relevant fields from Mailgun webhook payload
+        const {
+            from,
+            recipient,
+            subject,
+            'body-plain': bodyPlain,
+            'stripped-text': strippedText,
+        } = req.body;
+
+        // Validate required fields
+        if (!from || !recipient) {
+            return res.status(400).json({ error: "Missing required fields: 'from' or 'recipient'" });
+        }
+
+        // Use the stripped text if available, otherwise fallback to plain body
+        const emailContent = strippedText || bodyPlain;
+
+        if (!emailContent) {
+            return res.status(400).json({ error: "Missing email content" });
+        }
+
+        console.log('Processed email:', {
+            from,
+            recipient,
+            subject,
+            emailContent,
+        });
+
+        // Respond with success
+        res.status(200).json({ message: 'Email received successfully' });
+
+    } catch (error) {
+        console.error('Error handling webhook:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.listen(3000, () => console.log('Server running on port 3000'));
+```
+
+---
+
+### Key Updates
+
+1. **Parse `multipart/form-data` with `multer`**:
+   The `upload.any()` middleware parses all fields in the `multipart/form-data` payload, allowing you to access fields like `from`, `recipient`, `subject`, and `body-plain` in `req.body`.
+
+2. **Extract Mailgun-Specific Fields**:
+   Mailgun's webhook sends specific fields like:
+   - `from`: Sender's email address.
+   - `recipient`: Recipient's email address.
+   - `subject`: Email subject.
+   - `body-plain`: Plain text version of the email body.
+   - `stripped-text`: A version of the email body with quoted replies and signatures removed.
+
+3. **Graceful Error Handling**:
+   Validate the required fields (`from`, `recipient`, `body-plain`) and return appropriate error messages if any are missing.
+
+---
+
+### Debugging with Logs
+
+To ensure you’re processing the webhook payload correctly, add debug logs to inspect `req.body`. Mailgun logs the payload format in its dashboard under "Sending" > "Logs". Use this information to confirm which fields you need to handle.
+
+---
+
+### Testing the Webhook
+
+1. **Use Mailgun's "Send Test Webhook" Feature**:
+   - Navigate to your route in the Mailgun dashboard.
+   - Click "Send Test Webhook" to send a sample payload to your endpoint.
+
+2. **Log Incoming Payload**:
+   - Inspect the logged payload structure in your server to confirm it matches what your handler expects.
+
+3. **Refine Field Handling**:
+   - Update the handler to account for any additional fields or edge cases observed in the payload.
+
+---
+
+### Final Notes
+
+- If you need to store the email or process it further (e.g., saving to a database), you can extend the handler to include such functionality.
+- Once the webhook is working correctly, remove debug logs to keep your code clean and production-ready.
+
+Let me know if you need further assistance!

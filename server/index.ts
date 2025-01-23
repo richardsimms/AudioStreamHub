@@ -5,12 +5,13 @@ import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 
-// Configure multer to accept any field
+// Configure multer to accept any field without restrictions
 const upload = multer({ 
+  storage: multer.memoryStorage(),
   limits: {
     fieldSize: 10 * 1024 * 1024 // 10MB limit for fields
   }
-});
+}).any();
 
 // Parse JSON payloads
 app.use(express.json());
@@ -18,8 +19,20 @@ app.use(express.json());
 // Parse URL-encoded bodies
 app.use(express.urlencoded({ extended: true }));
 
-// Parse multipart/form-data (for Mailgun webhooks)
-app.use(upload.any()); // Accept any fields from Mailgun
+// Use multer middleware before routes
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/email')) {
+    upload(req, res, (err) => {
+      if (err) {
+        console.error('Multer error:', err);
+        return res.status(500).json({ error: 'Upload error', message: err.message });
+      }
+      next();
+    });
+  } else {
+    next();
+  }
+});
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -30,6 +43,7 @@ app.use((req, res, next) => {
   if (path.startsWith("/api/email")) {
     console.log("Request Headers:", req.headers);
     console.log("Request Body:", req.body);
+    console.log("Request Files:", req.files);
     console.log("Request Method:", req.method);
   }
 
@@ -62,11 +76,11 @@ app.use((req, res, next) => {
   const server = registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    console.error('Express error:', err);
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
     res.status(status).json({ message });
-    throw err;
   });
 
   if (app.get("env") === "development") {

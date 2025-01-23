@@ -30,7 +30,6 @@ export function registerRoutes(app: Express): Server {
       console.log("Received webhook request method:", req.method);
       console.log("Received webhook request headers:", req.headers);
       console.log("Received webhook request body:", JSON.stringify(req.body, null, 2));
-      console.log("Received webhook request files:", req.files);
 
       // For GET requests, return a success message (useful for webhook verification)
       if (req.method === 'GET') {
@@ -47,8 +46,8 @@ export function registerRoutes(app: Express): Server {
         'stripped-text': strippedText,
         'message-headers': messageHeaders,
         timestamp,
-        token,
-        signature
+        signature,
+        token
       } = req.body;
 
       console.log("Processed webhook data:", {
@@ -69,7 +68,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Use the sender's email or 'from' field to find the corresponding user
-      const senderEmail = sender || from;
+      const senderEmail = sender || (from && from.match(/<(.+)>/) ? from.match(/<(.+)>/)[1] : from);
       if (!senderEmail) {
         return res.status(400).json({ error: "No sender email found" });
       }
