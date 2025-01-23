@@ -27,7 +27,14 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Email webhook endpoint for Mailgun - handle both GET and POST
-  app.all("/api/email/incoming", upload.none(), async (req, res) => {
+  app.all("/api/email/incoming", upload.fields([
+    { name: "from" },
+    { name: "subject" },
+    { name: "body-plain" },
+    { name: "recipient" },
+    { name: "sender" },
+    { name: "stripped-text" }
+  ]), async (req, res) => {
     try {
       console.log("Received webhook request headers:", req.headers);
       console.log("Received webhook request body:", JSON.stringify(req.body, null, 2));
