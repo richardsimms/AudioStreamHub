@@ -158,8 +158,13 @@ async function processContent(contentId: number) {
     const summary = await summarizeContent(content.originalContent);
     console.log(`Generated summary for content ${contentId}`);
 
-    // Generate audio with TTS
-    const audioUrl = await textToSpeech(content.originalContent);
+    // Generate audio with TTS using the summary
+    const summaryText = [
+      (summary as any).intro,
+      ...(summary as any).key_points,
+      (summary as any).ending
+    ].join('. ');
+    const audioUrl = await textToSpeech(summaryText);
     console.log(`Generated audio for content ${contentId}`);
 
     // Update content with summary and audio URL
