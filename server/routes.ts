@@ -60,8 +60,25 @@ export function registerRoutes(app: Express): Server {
         timestamp
       });
 
-      // Use stripped text if available, otherwise fallback to plain body
-      const contentToProcess = strippedText || bodyPlain;
+      const TurndownService = require('turndown');
+      const turndownService = new TurndownService({
+        headingStyle: 'atx',
+        hr: '---',
+        bulletListMarker: '-',
+        codeBlockStyle: 'fenced'
+      });
+
+      // Get HTML content if available, otherwise use plain text
+      const htmlContent = req.body['body-html'] || req.body['stripped-html'];
+      let contentToProcess;
+      
+      if (htmlContent) {
+        // Convert HTML to Markdown
+        contentToProcess = turndownService.turndown(htmlContent);
+      } else {
+        // Fallback to plain text
+        contentToProcess = strippedText || bodyPlain;
+      }
 
       if (!contentToProcess) {
         return res.status(400).json({ error: "No content found in email" });
