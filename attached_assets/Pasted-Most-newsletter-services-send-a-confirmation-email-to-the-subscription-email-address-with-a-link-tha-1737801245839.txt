@@ -1,0 +1,66 @@
+Most newsletter services send a confirmation email to the subscription email address with a link that needs to be clicked to verify the subscription. Since your app uses unique emails routed via Mailgun, you need to handle these verification emails programmatically.
+
+Here’s how to solve this:
+
+1. Receive and Parse the Verification Email
+When Substack (or any platform) sends the verification email:
+The email will be routed to your app via Mailgun's webhook.
+Parse the email body to extract the verification link.
+Example Mailgun Webhook Handler:
+
+from flask import Flask, request
+import re
+import requests
+
+app = Flask(__name__)
+
+@app.route('/email-webhook', methods=['POST'])
+def handle_incoming_email():
+    # Get email details from Mailgun
+    email_body = request.form.get("body-plain")  # Plain text email content
+    recipient = request.form.get("recipient")   # Unique user email (e.g., user@speasy.app)
+
+    # Regex to find the confirmation link
+    verification_link = re.search(r'(https?://\S+)', email_body)
+    if verification_link:
+        confirmation_url = verification_link.group(0)
+        
+        # Automatically verify the subscription
+        response = requests.get(confirmation_url)
+        if response.status_code == 200:
+            print(f"Subscription confirmed for {recipient}")
+        else:
+            print(f"Failed to confirm subscription for {recipient}")
+
+    return "OK", 200
+
+if __name__ == '__main__':
+    app.run(port=5000)
+2. Handle the Verification Link
+Use regular expressions to extract the confirmation link from the email body.
+Automatically make a GET or POST request to the link to confirm the subscription.
+3. Store Verification Status
+Save the status of each subscription in your database to ensure users are aware of which subscriptions are active.
+Database Schema Example:
+
+CREATE TABLE user_subscriptions (
+    id SERIAL PRIMARY KEY,
+    user_id UUID NOT NULL,
+    newsletter_name VARCHAR NOT NULL,
+    status VARCHAR DEFAULT 'pending', -- 'pending', 'verified', 'failed'
+    confirmation_url TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+Update the subscription status based on whether the verification was successful.
+
+4. Notify Users of Verification Issues
+If automatic verification fails (e.g., due to captchas), notify the user via email or in-app notification:
+Provide a button or link they can click to manually verify their subscription.
+Include the extracted confirmation URL in the notification for convenience.
+Example Email to User:
+
+Subject: Action Required to Complete Your Newsletter Subscription
+Body:
+We tried to confirm your subscription to [Newsletter Name], but it requires manual confirmation.
+Please click the link below to complete the process:
+[Verification Link]

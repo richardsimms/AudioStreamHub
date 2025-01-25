@@ -8,18 +8,20 @@ export function setupMailgun() {
   console.log("Starting Mailgun setup...");
 
   if (!process.env.MAILGUN_API_KEY) {
-    console.error("Mailgun configuration error: MAILGUN_API_KEY environment variable is not set");
+    console.error(
+      "Mailgun configuration error: MAILGUN_API_KEY environment variable is not set",
+    );
     return;
   }
 
   const mailgun = new Mailgun(FormData);
   mg = mailgun.client({
-    username: 'api',
+    username: "api",
     key: process.env.MAILGUN_API_KEY,
   });
 
   // Verify domain and routes setup
-  verifyDomainSetup().catch(error => {
+  verifyDomainSetup().catch((error) => {
     console.error("Failed to verify Mailgun setup:", error);
   });
 }
@@ -34,7 +36,7 @@ async function verifyDomainSetup() {
     console.log(`Found ${domainsList.length} domains in Mailgun account`);
 
     // Find speasy.app domain
-    const customDomain = domainsList.find(d => d.name === 'speasy.app');
+    const customDomain = domainsList.find((d) => d.name === "speasy.app");
     if (!customDomain) {
       console.error("speasy.app domain not found in Mailgun account");
       return;
@@ -49,7 +51,9 @@ async function verifyDomainSetup() {
 
     // Verify the MX records specifically for receiving emails
     const receivingRecords = domainInfo.receiving_dns_records || [];
-    const mxRecords = receivingRecords.filter((r: any) => r.record_type === 'MX');
+    const mxRecords = receivingRecords.filter(
+      (r: any) => r.record_type === "MX",
+    );
 
     if (!mxRecords.length) {
       console.error("No MX records found. Email receiving will not work.");
@@ -57,19 +61,25 @@ async function verifyDomainSetup() {
     }
 
     // Verify all MX records are valid
-    const invalidMxRecords = mxRecords.filter((r: any) => r.valid !== 'valid');
+    const invalidMxRecords = mxRecords.filter((r: any) => r.valid !== "valid");
     if (invalidMxRecords.length > 0) {
       console.error("Invalid MX records found:", invalidMxRecords);
       return;
     }
 
     // Check all required DNS records
-    const receivingValid = receivingRecords.every((record: any) => record.valid === 'valid');
+    const receivingValid = receivingRecords.every(
+      (record: any) => record.valid === "valid",
+    );
     const sendingRecords = domainInfo.sending_dns_records || [];
-    const sendingValid = sendingRecords.every((record: any) => record.valid === 'valid');
+    const sendingValid = sendingRecords.every(
+      (record: any) => record.valid === "valid",
+    );
 
-    if (domainInfo.state === 'active' && receivingValid && sendingValid) {
-      console.log("Domain is properly configured for receiving and sending emails");
+    if (domainInfo.state === "active" && receivingValid && sendingValid) {
+      console.log(
+        "Domain is properly configured for receiving and sending emails",
+      );
 
       // Set up routes only if domain is properly configured
       console.log("Setting up email routes...");
@@ -80,8 +90,10 @@ async function verifyDomainSetup() {
         state: domainInfo.state,
         receivingValid,
         sendingValid,
-        invalidReceiving: receivingRecords.filter((r: any) => r.valid !== 'valid'),
-        invalidSending: sendingRecords.filter((r: any) => r.valid !== 'valid')
+        invalidReceiving: receivingRecords.filter(
+          (r: any) => r.valid !== "valid",
+        ),
+        invalidSending: sendingRecords.filter((r: any) => r.valid !== "valid"),
       });
     }
   } catch (error) {
@@ -106,7 +118,7 @@ async function setupEmailRoutes() {
     }
 
     // Use the full Replit URL from the request
-    const webhookUrl = "https://7618ae55-dcd1-4178-8a15-04009091ee27-00-q5sdxm13xgps.riker.replit.dev";
+    const webhookUrl = "https://speasy-mail.replit.app";
     const emailEndpoint = `${webhookUrl}/api/email/incoming`;
     console.log("Configuring route with webhook URL:", emailEndpoint);
 
@@ -114,25 +126,32 @@ async function setupEmailRoutes() {
     const routeConfig = {
       expression: `match_recipient(".*@${process.env.MAILGUN_DOMAIN}")`,
       action: [
-        'store()',  // Store the message first
-        `forward("${emailEndpoint}")`,  // Then forward to our webhook
-        'stop()'    // Stop processing after forwarding
+        "store()", // Store the message first
+        `forward("${emailEndpoint}")`, // Then forward to our webhook
+        "stop()", // Stop processing after forwarding
       ],
       description: "Forward incoming emails to our API",
-      priority: 0   // Highest priority
+      priority: 0, // Highest priority
     };
 
-    console.log("Creating new route with configuration:", JSON.stringify(routeConfig, null, 2));
+    console.log(
+      "Creating new route with configuration:",
+      JSON.stringify(routeConfig, null, 2),
+    );
     const newRoute = await mg.routes.create(routeConfig);
-    console.log("Successfully created route:", JSON.stringify(newRoute, null, 2));
-
+    console.log(
+      "Successfully created route:",
+      JSON.stringify(newRoute, null, 2),
+    );
   } catch (error) {
     console.error("Error managing Mailgun routes:", error);
     throw error;
   }
 }
 
-export async function generateForwardingEmail(_userId: number): Promise<string> {
+export async function generateForwardingEmail(
+  _userId: number,
+): Promise<string> {
   if (!process.env.MAILGUN_DOMAIN) {
     throw new Error("Mailgun domain not configured");
   }
