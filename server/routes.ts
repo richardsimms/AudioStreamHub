@@ -85,6 +85,9 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ error: "User not found" });
       }
 
+      // Check if this is a verification email
+      const verificationLink = await processVerificationLink(contentToProcess);
+      
       // Create content entry
       const [content] = await db
         .insert(contents)
@@ -94,6 +97,11 @@ export function registerRoutes(app: Express): Server {
           originalContent: contentToProcess,
           sourceEmail: senderEmail,
           isProcessed: false,
+          metadata: verificationLink ? {
+            type: 'verification',
+            link: verificationLink,
+            status: 'processed'
+          } : undefined
         })
         .returning();
 

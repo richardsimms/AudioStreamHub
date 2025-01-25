@@ -143,6 +143,37 @@ async function setupEmailRoutes() {
       "Successfully created route:",
       JSON.stringify(newRoute, null, 2),
     );
+
+
+async function processVerificationLink(content: string): Promise<string | null> {
+  // Common patterns for verification links
+  const patterns = [
+    /https?:\/\/[^\s<>"]+?(?:confirm|verify|subscription|activate)[^\s<>"]+/i,
+    /https?:\/\/substack\.com\/[^\s<>"]+/i,
+    /https?:\/\/cdn\.substack\.com\/[^\s<>"]+/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = content.match(pattern);
+    if (match) {
+      try {
+        const response = await fetch(match[0], {
+          method: 'GET',
+          redirect: 'follow',
+        });
+        if (response.ok) {
+          console.log('Successfully verified subscription');
+          return match[0];
+        }
+      } catch (error) {
+        console.error('Error verifying subscription:', error);
+      }
+    }
+  }
+  return null;
+}
+
+
   } catch (error) {
     console.error("Error managing Mailgun routes:", error);
     throw error;
