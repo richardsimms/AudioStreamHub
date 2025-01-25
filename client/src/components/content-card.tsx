@@ -1,6 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Play, Plus } from "lucide-react";
+import { Play, Plus, Trash2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { deleteContent } from "@/lib/api";
 import type { Content } from "@db/schema";
 
 interface ContentCardProps {
@@ -19,6 +21,18 @@ export function ContentCard({ content, onPlay }: ContentCardProps) {
           </Button>
           <Button variant="default" size="icon" onClick={onPlay}>
             <Play className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="destructive" 
+            size="icon" 
+            onClick={async () => {
+              if (window.confirm('Are you sure you want to delete this content?')) {
+                await deleteContent(content.id);
+                queryClient.invalidateQueries(["/api/contents"]);
+              }
+            }}
+          >
+            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       </CardHeader>

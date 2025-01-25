@@ -141,6 +141,19 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.delete("/api/contents/:id", async (req, res) => {
+    try {
+      await db.delete(contents).where(eq(contents.id, parseInt(req.params.id)));
+      res.status(200).json({ message: "Content deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting content:", error);
+      res.status(500).json({
+        error: "Internal server error",
+        message: "Failed to delete content"
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   setupMailgun();
   return httpServer;

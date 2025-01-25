@@ -12,6 +12,14 @@ export async function fetchContents(): Promise<Content[]> {
   return response.json();
 }
 
+export async function deleteContent(id: number) {
+  const response = await fetch(`/api/contents/${id}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) throw new Error("Failed to delete content");
+  return response.json();
+}
+
 export async function fetchPlaylists(): Promise<Playlist[]> {
   const response = await fetch("/api/playlists", {
     credentials: "include",
