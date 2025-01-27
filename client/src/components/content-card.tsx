@@ -11,6 +11,7 @@ interface ContentCardProps {
 }
 
 export function ContentCard({ content, onPlay }: ContentCardProps) {
+  const queryClient = useQueryClient();
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
