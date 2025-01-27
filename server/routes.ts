@@ -60,8 +60,28 @@ export function registerRoutes(app: Express): Server {
         timestamp
       });
 
-      // Use stripped text if available, otherwise fallback to plain body
-      const contentToProcess = strippedText || bodyPlain;
+      const { convert } = require('html-to-text');
+      const htmlContent = req.body['body-html'];
+      
+      // Process content in order of preference:
+      // 1. Stripped text (pre-processed by Mailgun)
+      // 2. HTML content converted to text
+      // 3. Plain text body
+      let contentToProcess = strippedText;
+      
+      if (!contentToProcess && htmlContent) {
+        contentToProcess = convert(htmlContent, {
+          wordwrap: 130,
+          selectors: [
+            { selector: 'table', format: 'dataTable' },
+            { selector: 'a', options: { hideLinkHrefIfSameAsText: true } }
+          ]
+        });
+      }
+      
+      if (!contentToProcess) {
+        contentToProcess = bodyPlain;
+      }
 
       if (!contentToProcess) {
         return res.status(400).json({ error: "No content found in email" });
