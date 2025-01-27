@@ -54,6 +54,14 @@ export function registerRoutes(app: Express): Server {
         token
       } = req.body;
 
+      console.log("=== Email Data ===");
+      console.log("Sender:", sender);
+      console.log("From:", from);
+      console.log("Subject:", subject);
+      console.log("Body Plain Length:", bodyPlain?.length);
+      console.log("Stripped Text Length:", strippedText?.length);
+      console.log("Timestamp:", timestamp);
+
       console.log("Processed webhook data:", {
         sender,
         from,
