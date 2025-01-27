@@ -145,8 +145,15 @@ async function setupEmailRoutes() {
     );
 
 
+} catch (error) {
+    console.error("Error managing Mailgun routes:", error);
+    throw error;
+  }
+}
+
 async function processVerificationLink(content: string): Promise<string | null> {
-  // Common patterns for verification links
+  console.log("Processing content for verification links:", content.substring(0, 100) + "...");
+  
   const patterns = [
     /https?:\/\/[^\s<>"]+?(?:confirm|verify|subscription|activate)[^\s<>"]+/i,
     /https?:\/\/substack\.com\/[^\s<>"]+/i,
@@ -156,6 +163,7 @@ async function processVerificationLink(content: string): Promise<string | null> 
   for (const pattern of patterns) {
     const match = content.match(pattern);
     if (match) {
+      console.log("Found potential verification link:", match[0]);
       try {
         const response = await fetch(match[0], {
           method: 'GET',
@@ -170,14 +178,8 @@ async function processVerificationLink(content: string): Promise<string | null> 
       }
     }
   }
+  console.log("No verification links found in content");
   return null;
-}
-
-
-  } catch (error) {
-    console.error("Error managing Mailgun routes:", error);
-    throw error;
-  }
 }
 
 export async function generateForwardingEmail(
