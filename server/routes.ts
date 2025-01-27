@@ -27,13 +27,9 @@ export function registerRoutes(app: Express): Server {
   app.all("/api/email/incoming", async (req, res) => {
     try {
       // Enhanced logging for debugging Mailgun webhook
-      console.log("=== START EMAIL PROCESSING ===");
       console.log("Received webhook request method:", req.method);
       console.log("Received webhook request headers:", req.headers);
       console.log("Received webhook request body:", JSON.stringify(req.body, null, 2));
-      console.log("Content-Type:", req.get('content-type'));
-      console.log("Raw body length:", req.body ? Object.keys(req.body).length : 0);
-      console.log("Files:", req.files);
 
       // For GET requests, return a success message (useful for webhook verification)
       if (req.method === 'GET') {
@@ -54,14 +50,6 @@ export function registerRoutes(app: Express): Server {
         token
       } = req.body;
 
-      console.log("=== Email Data ===");
-      console.log("Sender:", sender);
-      console.log("From:", from);
-      console.log("Subject:", subject);
-      console.log("Body Plain Length:", bodyPlain?.length);
-      console.log("Stripped Text Length:", strippedText?.length);
-      console.log("Timestamp:", timestamp);
-
       console.log("Processed webhook data:", {
         sender,
         from,
@@ -72,25 +60,8 @@ export function registerRoutes(app: Express): Server {
         timestamp
       });
 
-      const TurndownService = require('turndown');
-      const turndownService = new TurndownService({
-        headingStyle: 'atx',
-        hr: '---',
-        bulletListMarker: '-',
-        codeBlockStyle: 'fenced'
-      });
-
-      // Get HTML content if available, otherwise use plain text
-      const htmlContent = req.body['body-html'] || req.body['stripped-html'];
-      let contentToProcess;
-      
-      if (htmlContent) {
-        // Convert HTML to Markdown
-        contentToProcess = turndownService.turndown(htmlContent);
-      } else {
-        // Fallback to plain text
-        contentToProcess = strippedText || bodyPlain;
-      }
+      // Use stripped text if available, otherwise fallback to plain body
+      const contentToProcess = strippedText || bodyPlain;
 
       if (!contentToProcess) {
         return res.status(400).json({ error: "No content found in email" });
@@ -118,13 +89,6 @@ export function registerRoutes(app: Express): Server {
       const verificationLink = await processVerificationLink(contentToProcess);
       
       // Create content entry
-      console.log("Attempting to insert content into database:", {
-        userId: user.id,
-        title: subject || "Untitled",
-        contentLength: contentToProcess?.length,
-        sourceEmail: senderEmail
-      });
-
       const [content] = await db
         .insert(contents)
         .values({
@@ -140,8 +104,6 @@ export function registerRoutes(app: Express): Server {
           } : undefined
         })
         .returning();
-      
-      console.log("Successfully inserted content:", content);
 
       // Process content asynchronously
       processContent(content.id).catch(error => {

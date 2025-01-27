@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Play, Plus, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { deleteContent } from "@/lib/api";
-import { queryClient } from "@/lib/queryClient";
 import type { Content } from "@db/schema";
 
 interface ContentCardProps {
