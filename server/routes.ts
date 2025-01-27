@@ -64,19 +64,24 @@ export function registerRoutes(app: Express): Server {
       const htmlContent = req.body['body-html'];
       
       // Process content in order of preference:
-      // 1. Stripped text (pre-processed by Mailgun)
-      // 2. HTML content converted to text
+      // 1. HTML content converted to text (to handle rich formatting)
+      // 2. Stripped text (pre-processed by Mailgun)
       // 3. Plain text body
-      let contentToProcess = strippedText;
+      let contentToProcess = null;
       
-      if (!contentToProcess && htmlContent) {
+      if (htmlContent) {
         contentToProcess = convert(htmlContent, {
           wordwrap: 130,
           selectors: [
             { selector: 'table', format: 'dataTable' },
-            { selector: 'a', options: { hideLinkHrefIfSameAsText: true } }
+            { selector: 'a', options: { hideLinkHrefIfSameAsText: true } },
+            { selector: 'img', format: 'skip' }
           ]
         });
+      }
+      
+      if (!contentToProcess) {
+        contentToProcess = strippedText;
       }
       
       if (!contentToProcess) {
