@@ -37,6 +37,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Extract email data from Mailgun webhook payload
+      const { simpleParser } = require('mailparser');
       const {
         sender,
         from,
@@ -47,45 +48,23 @@ export function registerRoutes(app: Express): Server {
         'message-headers': messageHeaders,
         timestamp,
         signature,
-        token
+        token,
+        'body-mime': bodyMime
       } = req.body;
 
-      console.log("Processed webhook data:", {
-        sender,
-        from,
-        recipient,
-        subject,
-        bodyPlain,
-        strippedText,
-        timestamp
-      });
+      console.log("Processing email data...");
 
-      const { convert } = require('html-to-text');
-      const htmlContent = req.body['body-html'];
-      
-      // Process content in order of preference:
-      // 1. HTML content converted to text (to handle rich formatting)
-      // 2. Stripped text (pre-processed by Mailgun)
-      // 3. Plain text body
+      // Parse the MIME message if available
       let contentToProcess = null;
       
-      if (htmlContent) {
-        contentToProcess = convert(htmlContent, {
-          wordwrap: 130,
-          selectors: [
-            { selector: 'table', format: 'dataTable' },
-            { selector: 'a', options: { hideLinkHrefIfSameAsText: true } },
-            { selector: 'img', format: 'skip' }
-          ]
-        });
+      if (bodyMime) {
+        const parsed = await simpleParser(bodyMime);
+        contentToProcess = parsed.text || parsed.html || null;
       }
       
+      // Fallback to pre-processed content from Mailgun
       if (!contentToProcess) {
-        contentToProcess = strippedText;
-      }
-      
-      if (!contentToProcess) {
-        contentToProcess = bodyPlain;
+        contentToProcess = strippedText || bodyPlain;
       }
 
       if (!contentToProcess) {
