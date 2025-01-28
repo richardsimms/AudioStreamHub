@@ -49,10 +49,18 @@ export function registerRoutes(app: Express): Server {
         timestamp,
         signature,
         token,
-        'body-mime': bodyMime
+        'body-mime': bodyMime,
+        'body-html': bodyHtml
       } = req.body;
 
-      console.log("Processing email data...");
+      console.log("Processing email data with details:", {
+        hasBodyMime: !!bodyMime,
+        hasBodyHtml: !!bodyHtml,
+        hasStrippedText: !!strippedText,
+        hasBodyPlain: !!bodyPlain,
+        emailSubject: subject,
+        contentType: req.headers['content-type']
+      });
 
       // Parse the MIME message if available
       let contentToProcess = null;
