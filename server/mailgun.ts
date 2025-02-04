@@ -11,7 +11,7 @@ export function setupMailgun() {
   if (!process.env.MAILGUN_API_KEY) {
     console.error(
       "Mailgun configuration error: MAILGUN_API_KEY environment variable is not set",
-    );
+    );(
     return;
   }
 

@@ -1,0 +1,58 @@
+The updated code still doesn’t apply any transformation to rich HTML content. Although you’ve imported the html-to-text convert function, it isn’t actually used anywhere—particularly in processVerificationLink. If the problem with forwarded emails is that the rich content isn’t being parsed correctly, you’ll need to convert the HTML into plain text before running your regex.
+
+For example, you could modify processVerificationLink as follows:
+
+export async function processVerificationLink(content: string): Promise<string | null> {
+  // Convert HTML to plain text if needed
+  const plainText = convert(content, {
+    wordwrap: false,
+    selectors: [
+      { selector: 'a', options: { ignoreHref: false } }
+    ]
+  });
+
+  const patterns = [
+    /https?:\/\/[^\s<>"]+?(?:confirm|verify|subscription|activate)[^\s<>"]+/i,
+    /https?:\/\/substack\.com\/[^\s<>"]+/i,
+    /https?:\/\/cdn\.substack\.com\/[^\s<>"]+/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = plainText.match(pattern);
+    if (match) {
+      try {
+        const response = await fetch(match[0], {
+          method: 'GET',
+          redirect: 'follow',
+        });
+        if (response.ok) {
+          console.log('Successfully verified subscription');
+          return match[0];
+        }
+      } catch (error) {
+        console.error('Error verifying subscription:', error);
+      }
+    }
+  }
+  return null;
+}
+
+Additionally, there is a minor syntax error in setupMailgun: after logging the missing API key, there’s an extraneous parenthesis:
+
+if (!process.env.MAILGUN_API_KEY) {
+  console.error(
+    "Mailgun configuration error: MAILGUN_API_KEY environment variable is not set",
+  );(
+  return;
+}
+
+Remove the stray parenthesis so that it reads:
+
+if (!process.env.MAILGUN_API_KEY) {
+  console.error(
+    "Mailgun configuration error: MAILGUN_API_KEY environment variable is not set",
+  );
+  return;
+}
+
+In summary, unless you include the html-to-text conversion for processing rich HTML emails, the updated code won’t handle them any better. Adjusting processVerificationLink as shown above should help.
