@@ -11,7 +11,7 @@ export function setupMailgun() {
   if (!process.env.MAILGUN_API_KEY) {
     console.error(
       "Mailgun configuration error: MAILGUN_API_KEY environment variable is not set",
-    );(
+    );
     return;
   }
 
@@ -105,6 +105,13 @@ async function setupEmailRoutes() {
 }
 
 export async function processVerificationLink(content: string): Promise<string | null> {
+  const plainText = convert(content, {
+    wordwrap: false,
+    selectors: [
+      { selector: 'a', options: { ignoreHref: false } }
+    ]
+  });
+
   const patterns = [
     /https?:\/\/[^\s<>"]+?(?:confirm|verify|subscription|activate)[^\s<>"]+/i,
     /https?:\/\/substack\.com\/[^\s<>"]+/i,
@@ -112,7 +119,7 @@ export async function processVerificationLink(content: string): Promise<string |
   ];
 
   for (const pattern of patterns) {
-    const match = content.match(pattern);
+    const match = plainText.match(pattern);
     if (match) {
       try {
         const response = await fetch(match[0], {
