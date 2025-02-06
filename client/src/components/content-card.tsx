@@ -52,6 +52,15 @@ export function ContentCard({ content, onPlay }: ContentCardProps) {
               <div className="mt-2" dangerouslySetInnerHTML={{ 
                 __html: (content.summary as any).ending 
               }} />
+              {(content.summary as any).tags && (
+                <div className="mt-2 flex gap-2">
+                  {(content.summary as any).tags.map((tag: string, i: number) => (
+                    <span key={i} className="px-2 py-1 text-xs bg-secondary rounded-full">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
