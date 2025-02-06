@@ -81,7 +81,7 @@ async function setupEmailRoutes() {
       await mg.routes.destroy(route.id);
     }
 
-    const webhookUrl = "https://speasy-mail.replit.app";
+    const webhookUrl = process.env.REPLIT_URL || "https://speasy-mail.replit.app";
     const emailEndpoint = `${webhookUrl}/api/email/incoming`;
 
     // Create new route
