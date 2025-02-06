@@ -9,15 +9,16 @@ const app = express();
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: {
-    fieldSize: 10 * 1024 * 1024 // 10MB limit for fields
+    fieldSize: 10 * 1024 * 1024, // 10MB limit for fields
+    fileSize: 10 * 1024 * 1024 // 10MB limit for files
   }
 }).any();
 
-// Parse JSON payloads
-app.use(express.json());
+// Parse JSON payloads with increased limit
+app.use(express.json({limit: '10mb'}));
 
-// Parse URL-encoded bodies
-app.use(express.urlencoded({ extended: true }));
+// Parse URL-encoded bodies with increased limit
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Use multer middleware before routes
 app.use((req, res, next) => {
