@@ -1,5 +1,5 @@
 
-const { simpleParser } = require('mailparser');
+import { simpleParser } from 'mailparser';
 
 import type { Express } from "express";
 import { createServer, type Server } from "http";
