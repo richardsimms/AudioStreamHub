@@ -94,9 +94,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "No sender email found" });
       }
 
-      // For test purposes, use test user (ID: 999)
-      // In production, you would look up the user based on the sender's email
-      const [user] = await db
+      // We already have the user from above, no need to query again
         .select()
         .from(users)
         .where(eq(users.id, 999))
