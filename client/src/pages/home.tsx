@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AudioPlayer } from "@/components/audio-player";
@@ -26,7 +25,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background">
       <main className="container mx-auto p-4">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-12">
           {/* Main content area */}
           <div className="md:col-span-8">
             <Tabs defaultValue="All">
@@ -74,7 +73,7 @@ export default function Home() {
                   <AudioPlayer content={activeContent} />
                 ) : (
                   <div className="text-center text-muted-foreground">
-                    Select content to play this 
+                    Select content to play this
                   </div>
                 )}
               </CardContent>

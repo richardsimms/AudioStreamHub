@@ -23,13 +23,15 @@ export function ContentCard({ content, onPlay }: ContentCardProps) {
           <Button variant="default" size="icon" onClick={onPlay}>
             <Play className="h-4 w-4" />
           </Button>
-          <Button 
-            variant="destructive" 
-            size="icon" 
+          <Button
+            variant="destructive"
+            size="icon"
             onClick={async () => {
-              if (window.confirm('Are you sure you want to delete this content?')) {
+              if (
+                window.confirm("Are you sure you want to delete this content?")
+              ) {
                 await deleteContent(content.id);
-                queryClient.invalidateQueries(["/api/contents"]);
+                queryClient.invalidateQueries({ queryKey: ["/api/contents"] });
               }
             }}
           >
@@ -41,24 +43,36 @@ export function ContentCard({ content, onPlay }: ContentCardProps) {
         <div className="space-y-2">
           {content.summary && (
             <div className="text-sm text-muted-foreground">
-              <div dangerouslySetInnerHTML={{ 
-                __html: (content.summary as any).intro 
-              }} />
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: content.summary.intro, // Ensure intro is a string
+                }}
+              />
               <ul className="list-disc list-inside mt-2">
-                {(content.summary as any).key_points.map((point: string, i: number) => (
-                  <li key={i}>{point}</li>
-                ))}
+                {content.summary.key_points.map(
+                  (point: string, i: number) => (
+                    <li key={i}>{point}</li>
+                  ),
+                )}
               </ul>
-              <div className="mt-2" dangerouslySetInnerHTML={{ 
-                __html: (content.summary as any).ending 
-              }} />
-              {(content.summary as any).tags && (
+              <div
+                className="mt-2"
+                dangerouslySetInnerHTML={{
+                  __html: content.summary.ending, // Ensure ending is a string
+                }}
+              />
+              {content.summary.tags && (
                 <div className="mt-2 flex gap-2">
-                  {(content.summary as any).tags.map((tag: string, i: number) => (
-                    <span key={i} className="px-2 py-1 text-xs bg-secondary rounded-full">
-                      {tag}
-                    </span>
-                  ))}
+                  {(content.summary.tags as string[]).map(
+                    (tag: string, i: number) => (
+                      <span
+                        key={i}
+                        className="px-2 py-1 text-xs bg-secondary rounded-full"
+                      >
+                        {tag}
+                      </span>
+                    ),
+                  )}
                 </div>
               )}
             </div>

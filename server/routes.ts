@@ -41,14 +41,9 @@ export function registerRoutes(app: Express): Server {
       const {
         sender,
         from,
-        recipient,
         subject,
         'body-plain': bodyPlain,
-        'stripped-text': strippedText,
-        'message-headers': messageHeaders,
-        timestamp,
-        signature,
-        token,
+        'stripped-text': strippedText,        
         'body-mime': bodyMime,
         'body-html': bodyHtml
       } = req.body;
