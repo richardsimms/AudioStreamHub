@@ -1,3 +1,6 @@
+
+import { simpleParser } from 'mailparser';
+
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
@@ -46,7 +49,6 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Extract email data from Mailgun webhook payload
-      import { simpleParser } from 'mailparser';
       const {
         sender,
         from,
