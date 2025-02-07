@@ -7,7 +7,7 @@ import { db } from "@db";
 import { contents, users } from "@db/schema";
 import { eq, desc } from "drizzle-orm";
 import { summarizeContent } from "./openai";
-import { setupMailgun, generateForwardingEmail } from "./mailgun";
+import { setupMailgun, generateForwardingEmail, processVerificationLink } from "./mailgun";
 import { textToSpeech } from "./tts";
 
 export function registerRoutes(app: Express): Server {
