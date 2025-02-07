@@ -28,7 +28,7 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-12">
           {/* Main content area */}
           <div className="md:col-span-8">
-            <Tabs defaultValue="All">
+            <Tabs defaultValue="all">
               <TabsList>
                 <TabsTrigger value="all">All</TabsTrigger>
                 <TabsTrigger value="playlists">Playlists</TabsTrigger>
