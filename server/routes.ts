@@ -1,5 +1,5 @@
 
-import { simpleParser } from 'mailparser/lib/index.js';
+const { simpleParser } = require('mailparser');
 
 import type { Express } from "express";
 import { createServer, type Server } from "http";
