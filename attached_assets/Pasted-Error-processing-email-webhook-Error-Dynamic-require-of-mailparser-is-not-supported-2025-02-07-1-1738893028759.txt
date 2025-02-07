@@ -1,0 +1,151 @@
+Error processing email webhook: Error: Dynamic require of "mailparser" is not supported
+2025-02-07 12:49:35.86
+f155ac3b
+User
+at file:///home/runner/workspace/dist/index.js:6:9
+2025-02-07 12:49:35.86
+f155ac3b
+User
+at file:///home/runner/workspace/dist/index.js:283:32
+2025-02-07 12:49:35.86
+f155ac3b
+User
+at Layer.handle [as handle_request] (/home/runner/workspace/node_modules/express/lib/router/layer.js:95:5)
+2025-02-07 12:49:35.86
+f155ac3b
+User
+at next (/home/runner/workspace/node_modules/express/lib/router/route.js:149:13)
+2025-02-07 12:49:35.86
+f155ac3b
+User
+at next (/home/runner/workspace/node_modules/express/lib/router/route.js:145:7)
+2025-02-07 12:49:35.86
+f155ac3b
+User
+at next (/home/runner/workspace/node_modules/express/lib/router/route.js:145:7)
+2025-02-07 12:49:35.86
+f155ac3b
+User
+at next (/home/runner/workspace/node_modules/express/lib/router/route.js:145:7)
+2025-02-07 12:49:35.86
+f155ac3b
+User
+at next (/home/runner/workspace/node_modules/express/lib/router/route.js:145:7)
+2025-02-07 12:49:35.86
+f155ac3b
+User
+at next (/home/runner/workspace/node_modules/express/lib/router/route.js:145:7)
+2025-02-07 12:49:35.86
+f155ac3b
+User
+at next (/home/runner/workspace/node_modules/express/lib/router/route.js:145:7)
+2025-02-07 12:49:35.86
+f155ac3b
+User
+1:49:35 AM [express] POST /api/email/incoming 500 in 2ms :: {"error":"Internal server error","messag…
+
+Wrap
+
+Colors
+
+          } : undefined
+        })
+        .returning();
+      
+      console.log("Content created successfully:", content);
+
+      // Process content asynchronously
+      processContent(content.id).catch(error => {
+        console.error("Error processing content:", error);
+      });
+
+      res.status(200).json({
+        message: "Email received and queued for processing",
+        contentId: content.id
+      });
+    } catch (error) {
+      console.error("Error processing email webhook:", error);
+      res.status(500).json({
+        error: "Internal server error",
+        message: "Failed to process incoming email"
+      });
+    }
+  });
+
+  // Get all contents for the current user
+  app.get("/api/contents", async (_req, res) => {
+    try {
+      const allContents = await db
+        .select()
+        .from(contents)
+        .orderBy(desc(contents.createdAt));
+
+      res.json(allContents);
+    } catch (error) {
+      console.error("Error fetching contents:", error);
+      res.status(500).json({
+        error: "Internal server error",
+        message: "Failed to fetch contents"
+      });
+    }
+  });
+
+  app.delete("/api/contents/:id", async (req, res) => {
+    try {
+      await db.delete(contents).where(eq(contents.id, parseInt(req.params.id)));
+      res.status(200).json({ message: "Content deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting content:", error);
+      res.status(500).json({
+        error: "Internal server error",
+        message: "Failed to delete content"
+      });
+    }
+  });
+
+  const httpServer = createServer(app);
+  setupMailgun();
+  return httpServer;
+}
+
+async function processContent(contentId: number) {
+  try {
+    // Fetch the content to process
+    const [content] = await db
+      .select()
+      .from(contents)
+      .where(eq(contents.id, contentId))
+      .limit(1);
+
+    if (!content) {
+      console.error("Content not found:", contentId);
+      return;
+    }
+
+    console.log(`Processing content ${contentId}: ${content.title}`);
+
+    // Generate summary with OpenAI
+    const summary = await summarizeContent(content.originalContent);
+    console.log(`Generated summary for content ${contentId}`);
+
+    // Generate audio with TTS using the summary
+    const summaryText = [
+      (summary as any).intro,
+      ...(summary as any).key_points,
+      (summary as any).ending
+    ].join('. ');
+    const audioUrl = await textToSpeech(summaryText);
+    console.log(`Generated audio for content ${contentId}`);
+
+    // Update content with summary and audio URL
+    await db
+      .update(contents)
+      .set({
+        summary,
+        audioUrl,
+        isProcessed: true,
+        updatedAt: new Date(),
+      })
+      .where(eq(contents.id, contentId));
+
+    console.log(`Successfully processed content ${contentId}`);

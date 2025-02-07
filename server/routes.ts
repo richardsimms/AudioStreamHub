@@ -95,11 +95,8 @@ export function registerRoutes(app: Express): Server {
       }
 
       // We already have the user from above, no need to query again
-        .select()
-        .from(users)
-        .where(eq(users.id, 999))
-        .limit(1);
 
+        
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
