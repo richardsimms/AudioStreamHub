@@ -1,5 +1,5 @@
 
-import { simpleParser } from 'mailparser';
+import { simpleParser } from 'mailparser/lib/index.js';
 
 import type { Express } from "express";
 import { createServer, type Server } from "http";
