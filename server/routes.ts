@@ -26,10 +26,19 @@ export function registerRoutes(app: Express): Server {
   // Email webhook endpoint for Mailgun - handle both GET and POST
   app.all("/api/email/incoming", async (req, res) => {
     try {
-      // Enhanced logging for debugging Mailgun webhook
+      console.log("=== Starting Email Processing ===");
       console.log("Received webhook request method:", req.method);
       console.log("Received webhook request headers:", req.headers);
       console.log("Received webhook request body:", JSON.stringify(req.body, null, 2));
+      
+      // For test purposes, use test user (ID: 999)
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, 999))
+        .limit(1);
+      
+      console.log("Found user:", user);
 
       // For GET requests, return a success message (useful for webhook verification)
       if (req.method === 'GET') {
@@ -100,6 +109,13 @@ export function registerRoutes(app: Express): Server {
       // Check if this is a verification email
       const verificationLink = await processVerificationLink(contentToProcess);
       
+      console.log("Creating content entry with:", {
+        userId: user.id,
+        title: subject || "Untitled",
+        contentLength: contentToProcess?.length,
+        sourceEmail: senderEmail,
+      });
+
       // Create content entry
       const [content] = await db
         .insert(contents)
@@ -116,6 +132,8 @@ export function registerRoutes(app: Express): Server {
           } : undefined
         })
         .returning();
+      
+      console.log("Content created successfully:", content);
 
       // Process content asynchronously
       processContent(content.id).catch(error => {
