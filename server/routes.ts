@@ -1,4 +1,3 @@
-
 import { simpleParser } from 'mailparser';
 
 import type { Express } from "express";
@@ -33,14 +32,14 @@ export function registerRoutes(app: Express): Server {
       console.log("Received webhook request method:", req.method);
       console.log("Received webhook request headers:", req.headers);
       console.log("Received webhook request body:", JSON.stringify(req.body, null, 2));
-      
+
       // For test purposes, use test user (ID: 999)
       const [user] = await db
         .select()
         .from(users)
         .where(eq(users.id, 999))
         .limit(1);
-      
+
       console.log("Found user:", user);
 
       // For GET requests, return a success message (useful for webhook verification)
@@ -75,12 +74,12 @@ export function registerRoutes(app: Express): Server {
 
       // Parse the MIME message if available
       let contentToProcess = null;
-      
+
       if (bodyMime) {
         const parsed = await simpleParser(bodyMime);
         contentToProcess = parsed.text || parsed.html || null;
       }
-      
+
       // Fallback to pre-processed content from Mailgun
       if (!contentToProcess) {
         contentToProcess = strippedText || bodyPlain;
@@ -98,14 +97,14 @@ export function registerRoutes(app: Express): Server {
 
       // We already have the user from above, no need to query again
 
-        
+
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
 
       // Check if this is a verification email
       const verificationLink = await processVerificationLink(contentToProcess);
-      
+
       console.log("Creating content entry with:", {
         userId: user.id,
         title: subject || "Untitled",
@@ -129,7 +128,7 @@ export function registerRoutes(app: Express): Server {
           } : undefined
         })
         .returning();
-      
+
       console.log("Content created successfully:", content);
 
       // Process content asynchronously
