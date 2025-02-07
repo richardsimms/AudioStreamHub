@@ -12,7 +12,7 @@ import type { Content, Playlist as PlaylistType } from "@db/schema";
 
 export default function Home() {
   const [activeContent, setActiveContent] = useState<Content | null>(null);
-  
+
   const { data: contents = [] } = useQuery({
     queryKey: ["/api/contents"],
     queryFn: fetchContents,
@@ -29,13 +29,14 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
           {/* Main content area */}
           <div className="md:col-span-8">
-            <Tabs defaultValue="library">
+            <Tabs defaultValue="All">
               <TabsList>
-                <TabsTrigger value="library">Library</TabsTrigger>
+                <TabsTrigger value="all">All</TabsTrigger>
                 <TabsTrigger value="playlists">Playlists</TabsTrigger>
+                <TabsTrigger value="news">News</TabsTrigger>
               </TabsList>
-              
-              <TabsContent value="library">
+
+              <TabsContent value="all">
                 <ScrollArea className="h-[calc(100vh-12rem)]">
                   <div className="grid grid-cols-1 gap-4">
                     {contents.map((content) => (
@@ -73,7 +74,7 @@ export default function Home() {
                   <AudioPlayer content={activeContent} />
                 ) : (
                   <div className="text-center text-muted-foreground">
-                    Select content to play
+                    Select content to play this 
                   </div>
                 )}
               </CardContent>

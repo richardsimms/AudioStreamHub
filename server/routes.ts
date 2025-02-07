@@ -1,5 +1,3 @@
-import { simpleParser } from 'mailparser';
-
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
@@ -28,19 +26,10 @@ export function registerRoutes(app: Express): Server {
   // Email webhook endpoint for Mailgun - handle both GET and POST
   app.all("/api/email/incoming", async (req, res) => {
     try {
-      console.log("=== Starting Email Processing ===");
+      // Enhanced logging for debugging Mailgun webhook
       console.log("Received webhook request method:", req.method);
       console.log("Received webhook request headers:", req.headers);
       console.log("Received webhook request body:", JSON.stringify(req.body, null, 2));
-
-      // For test purposes, use test user (ID: 999)
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, 999))
-        .limit(1);
-
-      console.log("Found user:", user);
 
       // For GET requests, return a success message (useful for webhook verification)
       if (req.method === 'GET') {
@@ -48,6 +37,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Extract email data from Mailgun webhook payload
+      const { simpleParser } = await import('mailparser');
       const {
         sender,
         from,
@@ -95,24 +85,20 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "No sender email found" });
       }
 
-      // We already have the user from above, no need to query again
-
+      // For test purposes, use test user (ID: 999)
+      // In production, you would look up the user based on the sender's email
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, 999))
+        .limit(1);
 
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
 
       // Check if this is a verification email
-      const verificationResult = await processVerificationLink(contentToProcess);
-      
-      console.log("Verification result:", verificationResult);
-
-      console.log("Creating content entry with:", {
-        userId: user.id,
-        title: subject || "Untitled",
-        contentLength: contentToProcess?.length,
-        sourceEmail: senderEmail,
-      });
+      const verificationLink = await processVerificationLink(contentToProcess);
 
       // Create content entry
       const [content] = await db
@@ -123,16 +109,13 @@ export function registerRoutes(app: Express): Server {
           originalContent: contentToProcess,
           sourceEmail: senderEmail,
           isProcessed: false,
-          metadata: verificationResult.success ? {
+          metadata: verificationLink ? {
             type: 'verification',
-            link: verificationResult.link,
-            status: 'processed',
-            message: verificationResult.message
+            link: verificationLink,
+            status: 'processed'
           } : undefined
         })
         .returning();
-
-      console.log("Content created successfully:", content);
 
       // Process content asynchronously
       processContent(content.id).catch(error => {
