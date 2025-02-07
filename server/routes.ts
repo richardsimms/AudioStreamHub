@@ -46,7 +46,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Extract email data from Mailgun webhook payload
-      const { simpleParser } = await import('mailparser');
+      const { simpleParser } = require('mailparser');
       const {
         sender,
         from,
