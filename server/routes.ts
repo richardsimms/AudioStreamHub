@@ -103,7 +103,9 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Check if this is a verification email
-      const verificationLink = await processVerificationLink(contentToProcess);
+      const verificationResult = await processVerificationLink(contentToProcess);
+      
+      console.log("Verification result:", verificationResult);
 
       console.log("Creating content entry with:", {
         userId: user.id,
@@ -121,10 +123,11 @@ export function registerRoutes(app: Express): Server {
           originalContent: contentToProcess,
           sourceEmail: senderEmail,
           isProcessed: false,
-          metadata: verificationLink ? {
+          metadata: verificationResult.success ? {
             type: 'verification',
-            link: verificationLink,
-            status: 'processed'
+            link: verificationResult.link,
+            status: 'processed',
+            message: verificationResult.message
           } : undefined
         })
         .returning();

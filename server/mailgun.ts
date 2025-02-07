@@ -104,38 +104,63 @@ async function setupEmailRoutes() {
   }
 }
 
-export async function processVerificationLink(content: string): Promise<string | null> {
-  const plainText = convert(content, {
-    wordwrap: false,
-    selectors: [
-      { selector: 'a', options: { ignoreHref: false } }
-    ]
-  });
+export async function processVerificationLink(content: string): Promise<{ success: boolean; message: string; link?: string }> {
+  try {
+    if (!content) {
+      throw new Error('Invalid content provided');
+    }
 
-  const patterns = [
-    /https?:\/\/[^\s<>"]+?(?:confirm|verify|subscription|activate)[^\s<>"]+/i,
-    /https?:\/\/substack\.com\/[^\s<>"]+/i,
-    /https?:\/\/cdn\.substack\.com\/[^\s<>"]+/i
-  ];
+    const plainText = convert(content, {
+      wordwrap: false,
+      selectors: [
+        { selector: 'a', options: { ignoreHref: false } }
+      ]
+    });
 
-  for (const pattern of patterns) {
-    const match = plainText.match(pattern);
-    if (match) {
-      try {
-        const response = await fetch(match[0], {
-          method: 'GET',
-          redirect: 'follow',
-        });
-        if (response.ok) {
-          console.log('Successfully verified subscription');
-          return match[0];
+    const patterns = [
+      /https?:\/\/[^\s<>"]+?(?:confirm|verify|subscription|activate)[^\s<>"]+/i,
+      /https?:\/\/substack\.com\/[^\s<>"]+/i,
+      /https?:\/\/cdn\.substack\.com\/[^\s<>"]+/i
+    ];
+
+    for (const pattern of patterns) {
+      const match = plainText.match(pattern);
+      if (match) {
+        try {
+          const response = await fetch(match[0], {
+            method: 'GET',
+            redirect: 'follow',
+            headers: {
+              'User-Agent': 'Speasy-Verification/1.0'
+            }
+          });
+
+          if (response.ok) {
+            console.log('Successfully verified subscription');
+            return {
+              success: true,
+              message: 'Verification link processed successfully',
+              link: match[0]
+            };
+          }
+        } catch (error) {
+          console.error('Error accessing verification link:', error);
+          throw new Error(`Failed to access verification link: ${error.message}`);
         }
-      } catch (error) {
-        console.error('Error verifying subscription:', error);
       }
     }
+
+    return {
+      success: false,
+      message: 'No verification link found in content'
+    };
+  } catch (error) {
+    console.error('Error processing verification link:', error);
+    return {
+      success: false,
+      message: error.message
+    };
   }
-  return null;
 }
 
 export async function generateForwardingEmail(
