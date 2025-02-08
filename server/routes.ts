@@ -5,7 +5,11 @@ import { contents, users } from "@db/schema";
 import { eq, desc } from "drizzle-orm";
 import crypto from "crypto";
 
-function verifyMailgunSignature(token: string, timestamp: string, signature: string): boolean {
+function verifyMailgunSignature(
+  token: string,
+  timestamp: string,
+  signature: string,
+): boolean {
   const apiKey = process.env.MAILGUN_API_KEY;
   if (!apiKey) return false;
   const hmac = crypto.createHmac("sha256", apiKey);
@@ -21,15 +25,14 @@ function ensureAuthenticated(req: Request, res: Response, next: NextFunction) {
   }
   next();
 }
+
 import { summarizeContent } from "./openai";
-import { setupMailgun, generateForwardingEmail, processVerificationLink } from "./mailgun";
+import {
+  setupMailgun,
+  generateForwardingEmail,
+  processVerificationLink,
+} from "./mailgun";
 import { textToSpeech } from "./tts";
-//Removed duplicate import
-//import { processVerificationLink } from "./mailgun";
-import crypto from "crypto";
-
-//Removed duplicate function
-
 
 export function registerRoutes(app: Express): Server {
   // Generate a test email address
@@ -37,9 +40,10 @@ export function registerRoutes(app: Express): Server {
     try {
       // Generate a test email address with ID 999 (for testing purposes)
       const testEmail = await generateForwardingEmail(999);
-      res.json({ 
+      res.json({
         email: testEmail,
-        instructions: "Send an email to this address to test the email processing functionality"
+        instructions:
+          "Send an email to this address to test the email processing functionality",
       });
     } catch (error) {
       console.error("Error generating test email:", error);
@@ -49,31 +53,36 @@ export function registerRoutes(app: Express): Server {
 
   // Email webhook endpoint for Mailgun - handle both GET and POST
   app.all("/api/email/incoming", async (req, res) => {
-    const { token, timestamp, signature } = req.body;
-    if (!verifyMailgunSignature(token, timestamp, signature)) {
-      return res.status(403).json({ error: "Invalid Mailgun signature" });
-    }
-    //Removed duplicate declaration of token, timestamp, and signature
+    try {
+      const { token, timestamp, signature } = req.body;
+      if (!verifyMailgunSignature(token, timestamp, signature)) {
+        return res.status(403).json({ error: "Invalid Mailgun signature" });
+      }
       // Enhanced logging for debugging Mailgun webhook
       console.log("Received webhook request method:", req.method);
       console.log("Received webhook request headers:", req.headers);
-      console.log("Received webhook request body:", JSON.stringify(req.body, null, 2));
+      console.log(
+        "Received webhook request body:",
+        JSON.stringify(req.body, null, 2),
+      );
 
       // For GET requests, return a success message (useful for webhook verification)
-      if (req.method === 'GET') {
-        return res.status(200).json({ status: 'ok', message: 'Email webhook endpoint is active' });
+      if (req.method === "GET") {
+        return res
+          .status(200)
+          .json({ status: "ok", message: "Email webhook endpoint is active" });
       }
 
       // Extract email data from Mailgun webhook payload
-      const { simpleParser } = await import('mailparser');
+      const { simpleParser } = await import("mailparser");
       const {
         sender,
         from,
         subject,
-        'body-plain': bodyPlain,
-        'stripped-text': strippedText,        
-        'body-mime': bodyMime,
-        'body-html': bodyHtml
+        "body-plain": bodyPlain,
+        "stripped-text": strippedText,
+        "body-mime": bodyMime,
+        "body-html": bodyHtml,
       } = req.body;
 
       console.log("Processing email data with details:", {
@@ -82,28 +91,27 @@ export function registerRoutes(app: Express): Server {
         hasStrippedText: !!strippedText,
         hasBodyPlain: !!bodyPlain,
         emailSubject: subject,
-        contentType: req.headers['content-type']
+        contentType: req.headers["content-type"],
       });
 
       // Parse the MIME message if available
-      let contentToProcess = null;
-
+      let contentToProcess: string | null = null;
       if (bodyMime) {
         const parsed = await simpleParser(bodyMime);
         contentToProcess = parsed.text || parsed.html || null;
       }
-
       // Fallback to pre-processed content from Mailgun
       if (!contentToProcess) {
         contentToProcess = strippedText || bodyPlain;
       }
-
       if (!contentToProcess) {
         return res.status(400).json({ error: "No content found in email" });
       }
 
       // Use the sender's email or 'from' field to find the corresponding user
-      const senderEmail = sender || (from && from.match(/<(.+)>/) ? from.match(/<(.+)>/)[1] : from);
+      const senderEmail =
+        sender ||
+        (from && from.match(/<(.+)>/) ? from.match(/<(.+)>/)[1] : from);
       if (!senderEmail) {
         return res.status(400).json({ error: "No sender email found" });
       }
@@ -115,7 +123,6 @@ export function registerRoutes(app: Express): Server {
         .from(users)
         .where(eq(users.id, 999))
         .limit(1);
-
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -132,28 +139,30 @@ export function registerRoutes(app: Express): Server {
           originalContent: contentToProcess,
           sourceEmail: senderEmail,
           isProcessed: false,
-          metadata: verificationLink ? {
-            type: 'verification',
-            link: verificationLink,
-            status: 'processed'
-          } : undefined
+          metadata: verificationLink
+            ? {
+                type: "verification",
+                link: verificationLink,
+                status: "processed",
+              }
+            : undefined,
         })
         .returning();
 
       // Process content asynchronously
-      processContent(content.id).catch(error => {
+      processContent(content.id).catch((error) => {
         console.error("Error processing content:", error);
       });
 
       res.status(200).json({
         message: "Email received and queued for processing",
-        contentId: content.id
+        contentId: content.id,
       });
-  } catch (error) {
+    } catch (error) {
       console.error("Error processing email webhook:", error);
       res.status(500).json({
         error: "Internal server error",
-        message: "Failed to process incoming email"
+        message: "Failed to process incoming email",
       });
     }
   });
@@ -165,13 +174,12 @@ export function registerRoutes(app: Express): Server {
         .select()
         .from(contents)
         .orderBy(desc(contents.createdAt));
-
       res.json(allContents);
     } catch (error) {
       console.error("Error fetching contents:", error);
       res.status(500).json({
         error: "Internal server error",
-        message: "Failed to fetch contents"
+        message: "Failed to fetch contents",
       });
     }
   });
@@ -184,7 +192,7 @@ export function registerRoutes(app: Express): Server {
       console.error("Error deleting content:", error);
       res.status(500).json({
         error: "Internal server error",
-        message: "Failed to delete content"
+        message: "Failed to delete content",
       });
     }
   });
@@ -202,27 +210,22 @@ async function processContent(contentId: number) {
       .from(contents)
       .where(eq(contents.id, contentId))
       .limit(1);
-
     if (!content) {
       console.error("Content not found:", contentId);
       return;
     }
-
     console.log(`Processing content ${contentId}: ${content.title}`);
-
     // Generate summary with OpenAI
     const summary = await summarizeContent(content.originalContent);
     console.log(`Generated summary for content ${contentId}`);
-
     // Generate audio with TTS using the summary
     const summaryText = [
       (summary as any).intro,
       ...(summary as any).key_points,
-      (summary as any).ending
-    ].join('. ');
+      (summary as any).ending,
+    ].join(". ");
     const audioUrl = await textToSpeech(summaryText);
     console.log(`Generated audio for content ${contentId}`);
-
     // Update content with summary and audio URL
     await db
       .update(contents)
@@ -233,7 +236,6 @@ async function processContent(contentId: number) {
         updatedAt: new Date(),
       })
       .where(eq(contents.id, contentId));
-
     console.log(`Successfully processed content ${contentId}`);
   } catch (error) {
     console.error("Error processing content:", error);
