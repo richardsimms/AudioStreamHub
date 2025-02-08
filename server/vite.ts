@@ -4,7 +4,8 @@ import path, { dirname } from "path";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer, createLogger } from "vite";
 import type { Server } from "http";
-import viteConfig from "../vite.config"; // Make sure this path is correct
+import viteConfig from "../vite.config";
+import { nanoid } from "nanoid";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -25,7 +26,7 @@ export function log(message: string, source = "express") {
 export async function setupVite(app: Express, server: Server) {
   const vite = await createViteServer({
     ...viteConfig,
-    configFile: true, // Use the config file
+    configFile: false,
     customLogger: {
       ...viteLogger,
       error: (msg, options) => {
@@ -38,12 +39,15 @@ export async function setupVite(app: Express, server: Server) {
       hmr: { server },
     },
     appType: "custom",
+    // Add root configuration to point to the client directory
+    root: path.resolve(__dirname, "../client"),
   });
 
   app.use(vite.middlewares);
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
     try {
+      // Update path resolution to use the correct client directory
       const clientTemplate = path.resolve(
         __dirname,
         "..",
@@ -51,13 +55,15 @@ export async function setupVite(app: Express, server: Server) {
         "index.html",
       );
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
-
-      // Removed nanoid - let Vite handle caching
+      // Update the src path to reflect the correct location
+      template = template.replace(
+        `src="/src/main.tsx"`,
+        `src="./src/main.tsx?v=${nanoid()}"`,
+      );
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
-      console.error("Error during HTML transformation:", e);
       next(e);
     }
   });
