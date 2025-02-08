@@ -22,6 +22,7 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
+// server/vite.ts
 export async function setupVite(app: Express, server: Server) {
   const vite = await createViteServer({
     ...viteConfig,
@@ -38,15 +39,15 @@ export async function setupVite(app: Express, server: Server) {
       hmr: { server },
     },
     appType: "custom",
+    // Add root configuration to point to the client directory
+    root: path.resolve(__dirname, "../client"),
   });
 
   app.use(vite.middlewares);
-
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
-
     try {
-      // Resolve the path to client/index.html
+      // Update path resolution to use the correct client directory
       const clientTemplate = path.resolve(
         __dirname,
         "..",
@@ -54,35 +55,16 @@ export async function setupVite(app: Express, server: Server) {
         "index.html",
       );
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
-
-      // Append a cache-busting query parameter to src/main.tsx
+      // Update the src path to reflect the correct location
       template = template.replace(
         `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`,
+        `src="./src/main.tsx?v=${nanoid()}"`,
       );
-
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
       next(e);
     }
-  });
-}
-
-export function serveStatic(app: Express) {
-  const distPath = path.resolve(__dirname, "public");
-
-  if (!fs.existsSync(distPath)) {
-    throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
-    );
-  }
-
-  app.use(express.static(distPath));
-
-  // Fallback: serve index.html for any unmatched route
-  app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
