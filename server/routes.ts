@@ -24,16 +24,13 @@ function ensureAuthenticated(req: Request, res: Response, next: NextFunction) {
 import { summarizeContent } from "./openai";
 import { setupMailgun, generateForwardingEmail, processVerificationLink } from "./mailgun";
 import { textToSpeech } from "./tts";
-import { processVerificationLink } from "./mailgun";
+//Removed duplicate import
+//import { processVerificationLink } from "./mailgun";
 import crypto from "crypto";
 
-function verifyMailgunSignature(token: string, timestamp: string, signature: string): boolean {
-  const apiKey = process.env.MAILGUN_API_KEY;
-  const hmac = crypto.createHmac("sha256", apiKey!);
-  hmac.update(timestamp + token);
-  const expectedSignature = hmac.digest("hex");
-  return signature === expectedSignature;
-}
+//Removed duplicate function
+
+
 export function registerRoutes(app: Express): Server {
   // Generate a test email address
   app.get("/api/test-email", async (_req, res) => {
@@ -52,14 +49,11 @@ export function registerRoutes(app: Express): Server {
 
   // Email webhook endpoint for Mailgun - handle both GET and POST
   app.all("/api/email/incoming", async (req, res) => {
-  const { token, timestamp, signature } = req.body;
-  if (!verifyMailgunSignature(token, timestamp, signature)) {
-    return res.status(403).json({ error: "Invalid Mailgun signature" });
-  }
     const { token, timestamp, signature } = req.body;
     if (!verifyMailgunSignature(token, timestamp, signature)) {
       return res.status(403).json({ error: "Invalid Mailgun signature" });
     }
+    //Removed duplicate declaration of token, timestamp, and signature
       // Enhanced logging for debugging Mailgun webhook
       console.log("Received webhook request method:", req.method);
       console.log("Received webhook request headers:", req.headers);
@@ -155,7 +149,7 @@ export function registerRoutes(app: Express): Server {
         message: "Email received and queued for processing",
         contentId: content.id
       });
-    } catch (error) {
+  } catch (error) {
       console.error("Error processing email webhook:", error);
       res.status(500).json({
         error: "Internal server error",
