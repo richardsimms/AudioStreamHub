@@ -6,7 +6,16 @@ import { eq, desc } from "drizzle-orm";
 import { summarizeContent } from "./openai";
 import { setupMailgun, generateForwardingEmail, processVerificationLink } from "./mailgun";
 import { textToSpeech } from "./tts";
+import { processVerificationLink } from "./mailgun";
+import crypto from "crypto";
 
+function verifyMailgunSignature(token: string, timestamp: string, signature: string): boolean {
+  const apiKey = process.env.MAILGUN_API_KEY;
+  const hmac = crypto.createHmac("sha256", apiKey!);
+  hmac.update(timestamp + token);
+  const expectedSignature = hmac.digest("hex");
+  return signature === expectedSignature;
+}
 export function registerRoutes(app: Express): Server {
   // Generate a test email address
   app.get("/api/test-email", async (_req, res) => {
@@ -25,7 +34,10 @@ export function registerRoutes(app: Express): Server {
 
   // Email webhook endpoint for Mailgun - handle both GET and POST
   app.all("/api/email/incoming", async (req, res) => {
-    try {
+    const { token, timestamp, signature } = req.body;
+    if (!verifyMailgunSignature(token, timestamp, signature)) {
+      return res.status(403).json({ error: "Invalid Mailgun signature" });
+    }
       // Enhanced logging for debugging Mailgun webhook
       console.log("Received webhook request method:", req.method);
       console.log("Received webhook request headers:", req.headers);
