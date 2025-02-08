@@ -1,7 +1,9 @@
 import express, { type Request, Response, NextFunction } from "express";
 import multer from "multer";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import { setupVite, log } from "./vite";
+import express from "express";
+import path from "path";
 
 const app = express();
 
@@ -87,7 +89,10 @@ app.use((req, res, next) => {
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
-    serveStatic(app);
+    app.use(express.static(path.join(__dirname, "../client/dist")));
+    app.get("*", (_req, res) => {
+      res.sendFile(path.join(__dirname, "../client/dist/index.html"));
+    });
   }
 
   const PORT = 5000;
