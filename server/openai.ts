@@ -1,4 +1,3 @@
-
 import OpenAI from "openai";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -11,14 +10,14 @@ export async function summarizeContent(content: string) {
         {
           role: "system",
           content: `You are a Blinkits editor tasked with creating a concise summary and identifying topics. Your goal is to distill the main ideas into a brief, engaging format and provide relevant topic tags.
-          
+
 Follow these steps:
 1. Create a brief introduction (2-3 sentences)
 2. Extract 3-5 key points
 3. Craft a brief ending (1-2 sentences)
 4. Generate 5 follow-up questions
 5. Generate 1-3 relevant topic tags that best categorize this content
-          
+
 Format your response as a JSON object with the following structure:
 {
   "intro": "Brief introduction text",

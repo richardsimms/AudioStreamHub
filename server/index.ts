@@ -43,11 +43,14 @@ app.use((req, res, next) => {
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
   // Detailed request logging for debugging
-  if (path.startsWith("/api/email")) {
-    console.log("Request Headers:", req.headers);
-    console.log("Request Body:", req.body);
-    console.log("Request Files:", req.files);
+  if (process.env.NODE_ENV !== "production" && path.startsWith("/api/email")) {
     console.log("Request Method:", req.method);
+    console.log("Request Path:", path);
+    // Log non-sensitive information only
+    const safeBody = { ...req.body };
+    delete safeBody.token;
+    delete safeBody.signature;
+    console.log("Request Body:", safeBody);
   }
 
   const originalResJson = res.json;

@@ -1,8 +1,26 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
 import { contents, users } from "@db/schema";
 import { eq, desc } from "drizzle-orm";
+import crypto from "crypto";
+
+function verifyMailgunSignature(token: string, timestamp: string, signature: string): boolean {
+  const apiKey = process.env.MAILGUN_API_KEY;
+  if (!apiKey) return false;
+  const hmac = crypto.createHmac("sha256", apiKey);
+  hmac.update(timestamp + token);
+  const expectedSignature = hmac.digest("hex");
+  return signature === expectedSignature;
+}
+
+function ensureAuthenticated(req: Request, res: Response, next: NextFunction) {
+  // TODO: Replace with your actual auth check
+  if (!req.headers.authorization) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  next();
+}
 import { summarizeContent } from "./openai";
 import { setupMailgun, generateForwardingEmail, processVerificationLink } from "./mailgun";
 import { textToSpeech } from "./tts";
@@ -34,6 +52,10 @@ export function registerRoutes(app: Express): Server {
 
   // Email webhook endpoint for Mailgun - handle both GET and POST
   app.all("/api/email/incoming", async (req, res) => {
+  const { token, timestamp, signature } = req.body;
+  if (!verifyMailgunSignature(token, timestamp, signature)) {
+    return res.status(403).json({ error: "Invalid Mailgun signature" });
+  }
     const { token, timestamp, signature } = req.body;
     if (!verifyMailgunSignature(token, timestamp, signature)) {
       return res.status(403).json({ error: "Invalid Mailgun signature" });
@@ -143,7 +165,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Get all contents for the current user
-  app.get("/api/contents", async (_req, res) => {
+  app.get("/api/contents", ensureAuthenticated, async (_req, res) => {
     try {
       const allContents = await db
         .select()
@@ -160,7 +182,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.delete("/api/contents/:id", async (req, res) => {
+  app.delete("/api/contents/:id", ensureAuthenticated, async (req, res) => {
     try {
       await db.delete(contents).where(eq(contents.id, parseInt(req.params.id)));
       res.status(200).json({ message: "Content deleted successfully" });
